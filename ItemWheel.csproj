@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>ItemWheel</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <Authors>ItemWheel Team</Authors>
+    <Description>Duckov item wheel mod with embedded QuickWheel</Description>
+    <PackageTags>unity;mod;wheel;ui;selection</PackageTags>
+    <AssemblyName>ItemWheel</AssemblyName>
+    <RootNamespace>ItemWheel</RootNamespace>
+    <DuckovPath>D:\steam\steamapps\common\Escape from Duckov</DuckovPath>
+    <OutputPath>$(DuckovPath)\Duckov_Data\Mods\ItemWheel</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(DuckovPath)' != ''">
+    <DuckovPath>$(DuckovPath)</DuckovPath>
+  </PropertyGroup>
+
+  <!-- 直接包含 QuickWheel 源码，编译到 ItemWheel.dll 中 -->
+  <ItemGroup>
+    <Compile Include="..\QuickWheel\src\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(DuckovPath)' != ''">
+    <Reference Include="$(DuckovPath)\Duckov_Data\Managed\TeamSoda.*">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(DuckovPath)\Duckov_Data\Managed\ItemStatsSystem.dll">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(DuckovPath)\Duckov_Data\Managed\Unity*">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(DuckovPath)\Duckov_Data\Managed\Assembly-CSharp.dll">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(DuckovPath)\Duckov_Data\Managed\SodaLocalization.dll">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(DuckovPath)\Duckov_Data\Managed\DOTween.dll">
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="$(DuckovPath)\Duckov_Data\Managed\DOTweenPro.dll">
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="GameSource/**/*.cs" />
+    <Compile Remove="Examples/**/*.cs" />
+    <Compile Remove="Documentation/**/*.md" />
+    <Compile Remove="README.md" />
+  </ItemGroup>
+
+  <!-- 包含 texture 目录中的所有 PNG 文件到输出目录 -->
+  <ItemGroup>
+    <Content Include="texture\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

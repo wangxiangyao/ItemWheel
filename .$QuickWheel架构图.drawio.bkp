@@ -1,0 +1,173 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.2.8 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36" version="28.2.8">
+  <diagram name="QuickWheel完整架构图" id="完整架构分析">
+    <mxGraphModel dx="2000" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- IWheelInputHandler 接口 -->
+        <mxCell id="inputHandlerInterface" value="IWheelInputHandler (接口)&#xa;&#xa;📋 事件：&#xa;• Action&lt;Vector2&gt; OnPositionChanged&#xa;• Action OnConfirm&#xa;• Action OnCancel&#xa;&#xa;🔧 方法：&#xa;• void OnUpdate()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="50" y="50" width="180" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- MouseWheelInput 实现 -->
+        <mxCell id="mouseWheelInput" value="MouseWheelInput (实现)&#xa;&#xa;🔧 字段：&#xa;• KeyCode _triggerKey&#xa;• bool _isPressed&#xa;&#xa;📋 事件：继承接口&#xa;🔧 方法：&#xa;• OnUpdate() - 检测按键状态&#xa;• Reset() - 重置状态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b3d8ff;strokeColor=#4d7fc3;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="50" y="240" width="180" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- IWheelSelectionStrategy 接口 -->
+        <mxCell id="strategyInterface" value="IWheelSelectionStrategy (接口)&#xa;&#xa;🔧 方法：&#xa;• int GetSelectedIndex(&#xa;  WheelSelectionContext context)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="880" y="50" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- WheelSelectionContext 上下文 -->
+        <mxCell id="context" value="WheelSelectionContext&#xa;&#xa;📋 属性：&#xa;• Vector2 InputPosition&#xa;• Vector2 WheelCenter&#xa;• WheelConfig Config&#xa;• int SlotCount (只读)&#xa;• float DeadZoneRadius (只读)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="880" y="180" width="200" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- GridSelectionStrategy 实现 -->
+        <mxCell id="gridStrategy" value="GridSelectionStrategy (实现)&#xa;&#xa;🔧 字段：&#xa;• const int GRID_SLOT_COUNT = 9&#xa;• static float[] DIRECTION_ANGLES&#xa;&#xa;🔧 方法：&#xa;• GetSelectedIndex() - 角度计算&#xa;• IsInDeadZone() - 死区检测&#xa;• GetDirectionIndexFromAngle()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffd966;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="880" y="360" width="200" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- Wheel<T> 核心 -->
+        <mxCell id="wheel" value="Wheel&lt;T&gt; (轮盘核心)&#xa;&#xa;📋 事件：&#xa;• Action&lt;int, T&gt; OnItemSelected&#xa;• Action OnWheelShown&#xa;• Action&lt;int&gt; OnWheelHidden&#xa;&#xa;🔧 主要方法：&#xa;• SetInputHandler()&#xa;• SetSelectionStrategy()&#xa;• SetView()&#xa;• Show() / Hide()&#xa;• Update() - 调用InputHandler&#xa;• ManualSetHover()&#xa;• GetHoveredIndex()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="440" y="200" width="220" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- 关键方法 HandleInputPositionChanged -->
+        <mxCell id="handleInput" value="🔧 HandleInputPositionChanged()&#xa;&#xa;流程：&#xa;1. 检查状态 (Active?)&#xa;2. 创建WheelSelectionContext&#xa;3. 调用SelectionStrategy&#xa;4. 更新HoveredIndex&#xa;5. 触发SlotHovered事件" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e6ffcc;strokeColor=#82b366;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="420" y="450" width="260" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- IWheelView<T> 接口 -->
+        <mxCell id="viewInterface" value="IWheelView&lt;T&gt; (接口)&#xa;&#xa;🔧 方法：&#xa;• Attach/Detach&#xa;• Vector2 GetWheelCenter() ✨新增&#xa;• OnWheelShown/OnWheelHidden&#xa;• OnSlotDataChanged&#xa;• OnSelectionChanged&#xa;• OnHoverChanged" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="440" y="20" width="220" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- DefaultWheelView<T> 实现 -->
+        <mxCell id="defaultView" value="DefaultWheelView&lt;T&gt; (实现)&#xa;&#xa;🔧 字段：&#xa;• Transform _parent&#xa;• WheelUIManager&lt;T&gt; _uiManager&#xa;&#xa;🔧 方法：&#xa;• GetWheelCenter() - 返回鼠标位置✨&#xa;• Attach/Detach - UI管理器生命周期&#xa;• OnWheelShown/OnWheelHidden - 显示隐藏" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6d5f0;strokeColor=#9673a6;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="440" y="620" width="220" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- WheelUIManager<T> -->
+        <mxCell id="uiManager" value="WheelUIManager&lt;T&gt;&#xa;&#xa;🔧 字段：&#xa;• Canvas _wheelCanvas&#xa;• List&lt;WheelSlotDisplay&gt; _slotDisplays&#xa;• static Vector2Int[] GRID_POSITIONS&#xa;&#xa;🔧 方法：&#xa;• Show() - 显示在Input.mousePosition&#xa;• Hide() - 隐藏轮盘&#xa;• UpdateSelection() - 更新选中状态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="700" y="620" width="200" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- ItemWheelSystem -->
+        <mxCell id="itemwheel" value="ItemWheelSystem (业务系统)&#xa;&#xa;🔧 字段：&#xa;• Dictionary&lt;ItemWheelCategory, CategoryWheel&gt; _wheels&#xa;• CharacterMainControl _character&#xa;• CategoryWheel _activeWheel&#xa;&#xa;🔧 方法：&#xa;• Update() - 轮盘更新逻辑&#xa;• TryShowWheel() - 显示指定类别轮盘&#xa;• ConfirmActiveWheelSelection()&#xa;• CancelActiveWheel()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#cc0000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="50" y="460" width="200" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- WheelBuilder<T> -->
+        <mxCell id="builder" value="WheelBuilder&lt;T&gt;&#xa;&#xa;🔧 链式方法：&#xa;• WithConfig()&#xa;• WithAdapter()&#xa;• WithInput() - InputHandler✨&#xa;• WithSelectionStrategy()&#xa;• WithView()&#xa;• OnItemSelected/OnWheelShown/OnWheelHidden&#xa;• Build()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cce5ff;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="280" y="20" width="180" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- 事件流标注 -->
+        <mxCell id="eventFlow1" value="🔴 事件流1：输入处理" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="50" y="680" width="140" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eventFlow2" value="🔴 事件流2：选择逻辑" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="460" y="590" width="140" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eventFlow3" value="🔴 事件流3：UI更新" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="720" y="820" width="140" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- 连接线 - 输入流 -->
+        <mxCell id="edgeInput1" value="OnPositionChanged" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="mouseWheelInput" target="wheel" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="240" y="320" />
+              <mxPoint x="440" y="320" />
+            </Array>
+            <mxPoint x="350" y="280" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edgeInput2" value="OnConfirm/OnCancel" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="mouseWheelInput" target="wheel" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="140" y="410" />
+              <mxPoint x="140" y="450" />
+              <mxPoint x="380" y="450" />
+            </Array>
+            <mxPoint x="300" y="360" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 连接线 - 选择策略流 -->
+        <mxCell id="edgeStrategy1" value="使用context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="handleInput" target="gridStrategy" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="690" y="510" />
+              <mxPoint x="880" y="510" />
+            </Array>
+            <mxPoint x="790" y="480" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edgeStrategy2" value="包含" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="strategyInterface" target="context" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edgeStrategy3" value="实现" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="context" target="gridStrategy" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 连接线 - View流 -->
+        <mxCell id="edgeView1" value="GetWheelCenter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="handleInput" target="defaultView" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="510" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edgeView2" value="实现" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="viewInterface" target="defaultView" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edgeView3" value="使用" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="defaultView" target="uiManager" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 连接线 - ItemWheel流 -->
+        <mxCell id="edgeItemWheel1" value="使用WheelBuilder创建" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="itemwheel" target="wheel" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="550" />
+              <mxPoint x="350" y="550" />
+              <mxPoint x="350" y="300" />
+              <mxPoint x="440" y="300" />
+            </Array>
+            <mxPoint x="350" y="420" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 连接线 - Builder流 -->
+        <mxCell id="edgeBuilder1" value="配置" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="builder" target="wheel" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="370" y="110" as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 问题标注 -->
+        <mxCell id="problemFixed" value="✅ 已修复：&#xa;1. HandleInputPositionChanged已实现&#xa;2. IWheelView添加了GetWheelCenter()&#xa;3. DefaultWheelView实现了GetWheelCenter()" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="50" y="740" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pendingQuestion" value="🤔 待解决：&#xa;InputHandler的设计意义？&#xa;如何与ItemWheel的输入系统集成？" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="280" y="740" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="selectionBug" value="🐛 选择Bug：&#xa;GridSelectionStrategy上下反转&#xa;(Y轴坐标系问题)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#cc0000;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="400" width="160" height="60" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

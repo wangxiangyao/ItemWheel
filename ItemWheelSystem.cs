@@ -655,8 +655,7 @@ namespace ItemWheel
                     continue;
                 }
 
-                Debug.Log($"[ItemWheel] Checking item: {item.DisplayName}, Tags: {string.Join(",", item.Tags?.Select(t => t.name) ?? Array.Empty<string>())}");
-
+                
                 if (!MatchesCategory(item, category))
                 {
                     continue;
@@ -691,11 +690,8 @@ namespace ItemWheel
                 return false;
             }
 
-            Debug.Log($"[ItemWheel] MatchesCategory: Checking item {item.DisplayName} against category {category}");
-
             foreach (var tag in item.Tags)
-            {
-                Debug.Log($"[ItemWheel] MatchesCategory: Checking tag '{tag?.name ?? "null"}' for item {item.DisplayName}");
+                {
 
                 if (tag == null || string.IsNullOrEmpty(tag.name))
                 {
@@ -704,8 +700,7 @@ namespace ItemWheel
 
                 if (TagMappings.TryGetValue(tag.name, out ItemWheelCategory mapped))
                 {
-                    Debug.Log($"[ItemWheel] MatchesCategory: Tag '{tag.name}' maps to {mapped}, looking for {category}");
-
+                    
                     if (mapped == category)
                     {
                         Debug.Log($"[ItemWheel] MatchesCategory: Found match! Item {item.DisplayName} matches category {category}");
@@ -714,7 +709,7 @@ namespace ItemWheel
                 }
                 else
                 {
-                    Debug.Log($"[ItemWheel] MatchesCategory: Tag '{tag.name}' not found in TagMappings");
+                    // Tag not in mappings, continue checking next tag
                 }
             }
 
@@ -922,6 +917,23 @@ namespace ItemWheel
                 // 清空旧映射
                 System.Array.Fill(wheel.WheelToBackpackMapping, -1);
                 wheel.BackpackToWheelMapping.Clear();
+
+                // 🆕 检查是否至少有一个有效映射，如果全为-1则重新生成
+                bool hasAnyValidMapping = false;
+                for (int wheelPos = 0; wheelPos < 8; wheelPos++)
+                {
+                    if (savedMapping[wheelPos] >= 0)
+                    {
+                        hasAnyValidMapping = true;
+                        break;
+                    }
+                }
+
+                if (!hasAnyValidMapping)
+                {
+                    Debug.Log($"[ItemWheel] 🔄 No valid mappings found for {wheel.Category} (all -1), regenerating");
+                    return false;
+                }
 
                 // 验证保存的映射 - 只要有一个映射失败就重新生成
                 for (int wheelPos = 0; wheelPos < 8; wheelPos++)

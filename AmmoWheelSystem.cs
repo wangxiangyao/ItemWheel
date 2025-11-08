@@ -17,6 +17,11 @@ namespace ItemWheel
     /// </summary>
     public sealed class AmmoWheelSystem
     {
+        // 自定义格子Sprite（与物品轮盘一致）
+        private static Sprite _slotNormalSprite;
+        private static Sprite _slotHoverSprite;
+        private static Sprite _slotSelectedSprite;
+
         private class KeyState
         {
             public bool IsPressed;
@@ -33,6 +38,10 @@ namespace ItemWheel
         private Item[] _slots = Array.Empty<Item>();
 
         private readonly Dictionary<int, Item> _typeToItem = new Dictionary<int, Item>();
+
+        // 关闭与回调防抖
+        private bool _isClosing;
+        private bool _skipOnHidden;
 
         public bool HasActiveWheel => _wheel != null && _wheel.IsVisible;
 
@@ -94,6 +103,8 @@ namespace ItemWheel
                 return;
             }
 
+            LoadCustomSprites();
+
             _input = new QuickWheel.Input.MouseWheelInput();
             _view = new DefaultWheelView<Item>();
 
@@ -103,6 +114,9 @@ namespace ItemWheel
                     cfg.EnablePersistence = false;
                     cfg.GridCellSize = 90f;
                     cfg.GridSpacing = 12f;
+                    cfg.SlotNormalSprite = _slotNormalSprite;
+                    cfg.SlotHoverSprite = _slotHoverSprite;
+                    cfg.SlotSelectedSprite = _slotSelectedSprite;
                 })
                 .WithAdapter(new ItemWheelAdapter())
                 .WithView(_view)
@@ -118,6 +132,8 @@ namespace ItemWheel
 
         private void ShowWheel(Vector2 center)
         {
+            _isClosing = false;
+            _skipOnHidden = false;
             if (!RefreshSlots())
             {
                 return;
@@ -125,6 +141,7 @@ namespace ItemWheel
 
             _view?.SetWheelCenterBeforeShow(center);
             _input?.SetPressedState(true);
+            _wheel?.Show();
 
             int preferredIndex = GetPreferredIndex();
             if (preferredIndex >= 0)
@@ -144,6 +161,12 @@ namespace ItemWheel
 
         private void OnItemSelected(int index, Item item)
         {
+            if (_isClosing)
+            {
+                return;
+            }
+            _isClosing = true;
+            _skipOnHidden = true; // 点击已处理切换，隐藏回调不再重复
             if (item != null)
             {
                 SwitchAmmo(item);
@@ -153,6 +176,13 @@ namespace ItemWheel
 
         private void OnWheelHidden(int index)
         {
+            if (_skipOnHidden)
+            {
+                _skipOnHidden = false;
+                _isClosing = false;
+                return;
+            }
+
             if (_slots == null || index < 0 || index >= _slots.Length)
             {
                 return;
@@ -162,6 +192,7 @@ namespace ItemWheel
             {
                 SwitchAmmo(item);
             }
+            _isClosing = false;
         }
 
         private bool RefreshSlots()
@@ -283,6 +314,28 @@ namespace ItemWheel
         {
             var ch = CharacterMainControl.Main;
             try { ch?.TryToReload(prefered); } catch { }
+        }
+
+        private static void LoadCustomSprites()
+        {
+            if (_slotNormalSprite != null) return;
+            try
+            {
+                string modPath = System.IO.Path.GetDirectoryName(
+                    System.Reflection.Assembly.GetExecutingAssembly().Location
+                );
+                string texturePath = System.IO.Path.Combine(modPath, "texture");
+                string normalPath = System.IO.Path.Combine(texturePath, "WheelSlot_Normal.png");
+                string hoverPath = System.IO.Path.Combine(texturePath, "WheelSlot_Hover.png");
+                string selectedPath = System.IO.Path.Combine(texturePath, "WheelSlot_Selected.png");
+                _slotNormalSprite = SpriteLoader.LoadFromFile(normalPath, 100f);
+                _slotHoverSprite = SpriteLoader.LoadFromFile(hoverPath, 100f);
+                _slotSelectedSprite = SpriteLoader.LoadFromFile(selectedPath, 100f);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[AmmoWheel] 加载格子贴图失败: {e.Message}");
+            }
         }
     }
 }

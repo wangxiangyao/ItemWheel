@@ -44,8 +44,8 @@ namespace ItemWheel
 
         public static Color GetTextColorByDisplayQuality(DisplayQuality q)
         {
-            // 颜色整体“降一级”映射：
-            // Green→White, Blue→Green, Purple→Blue, Orange→Purple, Red→Orange, Q7→Red, Q8→Gold
+            // 颜色整体“再降一级”映射：
+            // Green→White, Blue→Green, Purple→Blue, Orange→Purple, Red→Orange, Q7→Orange, Q8→Gold
             return q switch
             {
                 DisplayQuality.White => White,
@@ -54,7 +54,7 @@ namespace ItemWheel
                 DisplayQuality.Purple => Blue,
                 DisplayQuality.Orange => Purple,
                 DisplayQuality.Red => Orange,
-                DisplayQuality.Q7 => Red,
+                DisplayQuality.Q7 => Orange,
                 DisplayQuality.Q8 => Gold,
                 _ => White
             };

@@ -22,8 +22,9 @@ namespace ItemWheel
             {
                 right = "x" + count.ToString();
             }
-            // 子弹同样显示稀有度颜色；耐久一般无，按默认逻辑
-            return new WheelItemWithDecor(item, overrideRightText: right, rightAlign: true);
+            // 子弹不降一级：按原始整数 Quality 映射颜色
+            var tint = RarityColorProvider.GetTintByQuality(item.Quality);
+            return new WheelItemWithDecor(item, overrideRightText: right, overrideTint: tint, rightAlign: true);
         }
 
         public Item FromWheelItem(IWheelItem item)
@@ -32,4 +33,3 @@ namespace ItemWheel
         }
     }
 }
-

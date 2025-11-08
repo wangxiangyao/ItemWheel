@@ -186,49 +186,31 @@ namespace ItemWheel
         /// <returns>是否成功显示</returns>
         public bool ShowWheel(ItemWheelCategory category, Vector2? wheelCenter = null)
         {
-            Debug.Log($"[ItemWheel] ShowWheel called for category: {category}");
-
             var wheel = EnsureWheel(category);
-            if (!RefreshCategorySlots(wheel))
+            bool isFirstLoad = wheel.Slots == null || wheel.Slots.All(s => s == null);
+
+            // 打开轮盘时不重置选择，保持之前选中的物品
+            if (!RefreshCategorySlots(wheel, reloadFromFile: isFirstLoad, resetSelection: false))
             {
-                Debug.LogWarning($"[ItemWheel] Failed to refresh slots for category: {category}");
+                Debug.LogWarning($"[轮盘] 刷新失败: {category}");
                 return false;
             }
 
-            var itemNames = wheel.Slots?.Where(s => s != null).Select(s => s.DisplayName).ToArray() ?? new string[0];
-            Debug.Log($"[ItemWheel] Slots refreshed: {wheel.Slots?.Length}, items: {string.Join(",", itemNames)}");
-
-            // 取消其他轮盘
             HideAllWheels();
 
-            // ⭐ 如果提供了中心位置，提前设置（在Show之前）
             if (wheelCenter.HasValue)
             {
                 wheel.View?.SetWheelCenterBeforeShow(wheelCenter.Value);
-                Debug.Log($"[ItemWheel] Wheel center pre-set to: {wheelCenter.Value}");
             }
 
-            // 设置输入处理器为按下状态（开始发送鼠标位置）
             wheel.Input?.SetPressedState(true);
-            Debug.Log($"[ItemWheel] Input pressed state set to true, IsPressed: {wheel.Input?.IsPressed}");
 
-            Debug.Log($"[ItemWheel] About to show wheel for category: {category}");
-
-            // 🆕 设置初始选中状态（如果有上次确认的索引）
             if (wheel.LastConfirmedIndex >= 0 && wheel.LastConfirmedIndex < wheel.Slots.Length && wheel.Slots[wheel.LastConfirmedIndex] != null)
             {
                 wheel.Wheel.SetSelectedIndex(wheel.LastConfirmedIndex);
-                Debug.Log($"[ItemWheel] Set initial selected index: {wheel.LastConfirmedIndex}");
-            }
-            else
-            {
-                Debug.Log($"[ItemWheel] No valid last confirmed index, using default selection");
             }
 
-            // 显示轮盘
             wheel.Wheel.Show();
-
-            Debug.Log($"[ItemWheel] Wheel.Show() completed. IsVisible: {wheel.Wheel.IsVisible}");
             return true;
         }
 
@@ -241,6 +223,23 @@ namespace ItemWheel
             {
                 wheel.Input?.SetPressedState(false);  // 重置输入状态
                 wheel.Wheel?.ManualCancel();
+            }
+
+            // 兜底：全局清理任意残留的拖拽状态，防止自投/异常导致的拖拽幽灵与 hover 卡住
+            try
+            {
+                var slots = UnityEngine.Object.FindObjectsOfType<QuickWheel.UI.WheelSlotDisplay>();
+                if (slots != null)
+                {
+                    foreach (var slot in slots)
+                    {
+                        slot.ForceCleanupDrag();
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[ItemWheel] HideAllWheels cleanup warning: {ex.Message}");
             }
         }
 
@@ -320,9 +319,14 @@ namespace ItemWheel
                 return;  // 轮盘还未创建，忽略
             }
 
-            if (!RefreshCategorySlots(wheel))
+            // 短按不应触发重排/重建布局，避免快捷键UI变化
+            // 仅在首次未初始化时刷新一次（并且不重置选择）
+            if (wheel.Slots == null || wheel.Slots.All(s => s == null))
             {
-                return;
+                if (!RefreshCategorySlots(wheel, reloadFromFile: false, resetSelection: false))
+                {
+                    return;
+                }
             }
 
             int index = GetPreferredIndex(wheel);
@@ -369,7 +373,7 @@ namespace ItemWheel
         private void HandleLongPressTimers()
         {
             float deltaTime = Time.unscaledDeltaTime;
-            const float longPressThreshold = 0.15f;
+            const float longPressThreshold = 0.2f;
 
             foreach (var kvp in _keyStates)
             {
@@ -407,6 +411,12 @@ namespace ItemWheel
         /// </summary>
         public void Dispose()
         {
+            // 🆕 取消背包监听
+            if (_inventory != null)
+            {
+                _inventory.onContentChanged -= OnInventoryContentChanged;
+            }
+
             foreach (CategoryWheel categoryWheel in _wheels.Values)
             {
                 categoryWheel.Wheel?.Dispose();
@@ -440,12 +450,41 @@ namespace ItemWheel
         /// <param name="character">要绑定的角色</param>
         public void BindCharacter(CharacterMainControl character)
         {
-            _character = character;
-            _inventory = character?.CharacterItem?.Inventory;
-            Debug.Log($"[ItemWheel] BindCharacter: Character is null: {_character == null}, Inventory is null: {_inventory == null}");
+            // 取消旧的背包监听
             if (_inventory != null)
             {
-                Debug.Log($"[ItemWheel] BindCharacter: Inventory has {_inventory.Content?.Count ?? 0} items");
+                _inventory.onContentChanged -= OnInventoryContentChanged;
+            }
+
+            _character = character;
+            _inventory = character?.CharacterItem?.Inventory;
+
+            if (_inventory != null)
+            {
+                // 🆕 订阅背包内容变化事件
+                _inventory.onContentChanged += OnInventoryContentChanged;
+            }
+        }
+
+        /// <summary>
+        /// 🆕 背包内容变化事件处理器
+        /// 当背包中物品位置变化时，刷新轮盘映射
+        /// </summary>
+        private void OnInventoryContentChanged(Inventory inventory, int changedSlot)
+        {
+            // 🆕 在交换过程中跳过处理，避免递归
+            if (_isPerformingSwap)
+            {
+                Debug.Log($"[轮盘] ⚠️ 背包变化(slot={changedSlot})被跳过，正在执行交换");
+                return;
+            }
+
+            Debug.Log($"[轮盘] 背包变化: slot={changedSlot}，刷新所有类别并重置选择");
+
+            foreach (var kvp in _wheels)
+            {
+                // 背包变化时重置选择为第一个
+                RefreshCategorySlots(kvp.Value, reloadFromFile: false, resetSelection: true);
             }
         }
 
@@ -504,8 +543,13 @@ namespace ItemWheel
             // 🆕 订阅槽位交换事件：当玩家在轮盘上拖拽物品时，同步到背包
             wheel.EventBus.OnSlotsSwapped += (fromIndex, toIndex) =>
             {
-                Debug.Log($"[ItemWheel] Wheel slots swapped: {category}, {fromIndex} <-> {toIndex}");
                 OnWheelSlotsSwapped(context, fromIndex, toIndex);
+            };
+
+            // 🆕 订阅选中改变事件：直接订阅 Wheel 的事件（绕过 EventBus 的事件锁）
+            wheel.OnSelectionChanged += (selectedIndex) =>
+            {
+                OnSelectionChanged(context, selectedIndex);
             };
 
             _wheels[category] = context;
@@ -514,31 +558,22 @@ namespace ItemWheel
 
         // 删除GetTriggerKeyForCategory方法，不再使用KeyCode
 
-        private bool RefreshCategorySlots(CategoryWheel wheel)
+        private bool RefreshCategorySlots(CategoryWheel wheel, bool reloadFromFile = false, bool resetSelection = true)
         {
-            // 🆕 防止递归：轮盘交换时跳过刷新
             if (_isPerformingSwap)
             {
-                Debug.Log($"[ItemWheel] Swap in progress, skip refresh for category: {wheel.Category}");
-                return true;  // 返回true避免触发错误逻辑
+                return true;
             }
-
-            Debug.Log($"[ItemWheel] RefreshCategorySlots for category: {wheel.Category}");
-            Debug.Log($"[ItemWheel] Inventory is null: {_inventory == null}");
-            Debug.Log($"[ItemWheel] Character is null: {_character == null}");
 
             if (_inventory == null)
             {
-                Debug.LogWarning("[ItemWheel] Inventory is null, cannot refresh slots");
                 return false;
             }
 
             List<Item> collected = CollectItemsForCategory(wheel.Category);
-            Debug.Log($"[ItemWheel] Collected {collected.Count} items for category: {wheel.Category}");
 
             if (collected.Count == 0)
             {
-                Debug.LogWarning($"[ItemWheel] No items found for category: {wheel.Category}");
                 wheel.Slots = new Item[WheelConfig.SLOT_COUNT];
                 wheel.Wheel.SetSlots(wheel.Slots);
                 return false;
@@ -546,24 +581,41 @@ namespace ItemWheel
 
             Item[] slotBuffer = new Item[WheelConfig.SLOT_COUNT];
 
-            // 🆕 尝试加载保存的映射
-            bool usingSavedMapping = TryLoadSavedMapping(wheel, collected, slotBuffer);
+            bool usingSavedMapping = false;
+
+            if (reloadFromFile)
+            {
+                usingSavedMapping = TryLoadSavedMapping(wheel, collected, slotBuffer);
+            }
 
             if (!usingSavedMapping)
             {
-                // 没有保存的映射或验证失败，创建新映射（按背包顺序）
-                Debug.Log($"[ItemWheel] Creating new mapping for category: {wheel.Category}");
                 CreateDefaultMapping(wheel, collected, slotBuffer);
             }
 
             wheel.Slots = slotBuffer;
             wheel.Wheel.SetSlots(slotBuffer);
 
-            if (wheel.LastConfirmedIndex < 0 ||
-                wheel.LastConfirmedIndex >= slotBuffer.Length ||
-                slotBuffer[wheel.LastConfirmedIndex] == null)
+            // 根据 resetSelection 参数决定是否重置选择
+            if (resetSelection)
             {
+                // 背包变化时：总是选择第一个
                 wheel.LastConfirmedIndex = GetFirstAvailableIndex(slotBuffer);
+            }
+            else
+            {
+                // 只是打开轮盘时：如果之前的选择还存在就保持，否则选第一个
+                if (wheel.LastConfirmedIndex < 0 || wheel.LastConfirmedIndex >= slotBuffer.Length || slotBuffer[wheel.LastConfirmedIndex] == null)
+                {
+                    wheel.LastConfirmedIndex = GetFirstAvailableIndex(slotBuffer);
+                }
+            }
+
+            // 更新快捷栏UI
+            if (wheel.LastConfirmedIndex >= 0)
+            {
+                var shortcutIndex = (int)wheel.Category;
+                Duckov.ItemShortcut.Set(shortcutIndex, slotBuffer[wheel.LastConfirmedIndex]);
             }
 
             return true;
@@ -613,11 +665,8 @@ namespace ItemWheel
                 return;
             }
 
-            if (index >= 0 && index < wheel.Slots.Length && wheel.Slots[index] != null)
-            {
-                wheel.LastConfirmedIndex = index;
-            }
-
+            // 🆕 松开快捷键：只使用物品，不改变下次打开的默认选中
+            // LastConfirmedIndex 只在点击时通过 OnSelectionChanged 更新
             if (item != null)
             {
                 UseItem(item, wheel.Category);
@@ -630,6 +679,24 @@ namespace ItemWheel
         }
 
         /// <summary>
+        /// 🆕 处理选中索引改变事件：更新快捷栏UI（不使用物品）
+        /// 参考 backpack_quickwheel 的 ChangeSelection 模式
+        /// </summary>
+        private void OnSelectionChanged(CategoryWheel wheel, int selectedIndex)
+        {
+            if (wheel == null) return;
+
+            wheel.LastConfirmedIndex = selectedIndex;
+
+            if (selectedIndex >= 0 && selectedIndex < wheel.Slots.Length && wheel.Slots[selectedIndex] != null)
+            {
+                var shortcutIndex = (int)wheel.Category;
+                Duckov.ItemShortcut.Set(shortcutIndex, wheel.Slots[selectedIndex]);
+                Debug.Log($"[轮盘] {wheel.Category} 点击选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName}");
+            }
+        }
+
+        /// <summary>
         /// 从物品栏收集指定类别的所有物品
         /// 按照物品栏顺序收集，最多收集8个物品（中心空位）
         /// </summary>
@@ -637,41 +704,28 @@ namespace ItemWheel
         /// <returns>物品列表</returns>
         private List<Item> CollectItemsForCategory(ItemWheelCategory category)
         {
-            Debug.Log($"[ItemWheel] CollectItemsForCategory: {category}");
             var result = new List<Item>(WheelConfig.SLOT_COUNT - 1);
 
             if (_inventory?.Content == null)
             {
-                Debug.LogWarning("[ItemWheel] Inventory content is null");
                 return result;
             }
 
-            Debug.Log($"[ItemWheel] Inventory has {_inventory.Content.Count} items");
-
             foreach (Item item in _inventory.Content)
             {
-                if (item == null)
+                if (item == null || !MatchesCategory(item, category))
                 {
                     continue;
                 }
 
-                
-                if (!MatchesCategory(item, category))
-                {
-                    continue;
-                }
-
-                Debug.Log($"[ItemWheel] Item {item.DisplayName} matches category {category}");
                 result.Add(item);
 
                 if (result.Count >= WheelConfig.SLOT_COUNT - 1)
                 {
-                    Debug.Log($"[ItemWheel] Reached max slot count ({WheelConfig.SLOT_COUNT - 1})");
                     break;
                 }
             }
 
-            Debug.Log($"[ItemWheel] Returning {result.Count} items for category {category}");
             return result;
         }
 
@@ -712,8 +766,6 @@ namespace ItemWheel
                     // Tag not in mappings, continue checking next tag
                 }
             }
-
-            Debug.Log($"[ItemWheel] MatchesCategory: No match found for item {item.DisplayName} in category {category}");
             return false;
         }
 
@@ -791,71 +843,46 @@ namespace ItemWheel
         /// </summary>
         private void OnWheelSlotsSwapped(CategoryWheel wheel, int fromWheelPos, int toWheelPos)
         {
-            Debug.Log($"[ItemWheel] ═══════ OnWheelSlotsSwapped Start ═══════");
-            Debug.Log($"[ItemWheel] Category: {wheel.Category}, From: {fromWheelPos}, To: {toWheelPos}");
+            // 🚨 关键防护：如果已经在执行交换，直接返回，防止递归调用
+            if (_isPerformingSwap)
+            {
+                Debug.Log($"[轮盘] ⚠️ 交换已在进行中，跳过重复调用");
+                return;
+            }
 
-            // 边界检查
             if (fromWheelPos < 0 || fromWheelPos >= 8 || toWheelPos < 0 || toWheelPos >= 8)
             {
-                Debug.LogWarning($"[ItemWheel] Invalid wheel positions: from={fromWheelPos}, to={toWheelPos}");
                 return;
             }
 
-            // 检查映射表是否已初始化
             if (wheel.WheelToBackpackMapping == null || wheel.BackpackToWheelMapping == null)
             {
-                Debug.LogWarning($"[ItemWheel] Mappings not initialized for category {wheel.Category}");
                 return;
             }
 
-            // 获取背包位置
             int fromBackpackPos = wheel.WheelToBackpackMapping[fromWheelPos];
             int toBackpackPos = wheel.WheelToBackpackMapping[toWheelPos];
 
-            Debug.Log($"[ItemWheel] Backpack positions: from={fromBackpackPos}, to={toBackpackPos}");
-
-            // 检查源位置是否有物品
-            if (fromBackpackPos == -1)
+            if (fromBackpackPos == -1 || toBackpackPos == -1)
             {
-                Debug.LogWarning($"[ItemWheel] Source wheel position {fromWheelPos} is empty (no backpack mapping)");
                 return;
             }
 
-            // 获取源物品
             var item = _inventory.GetItemAt(fromBackpackPos);
-            if (item == null)
+            var targetItem = _inventory.GetItemAt(toBackpackPos);
+
+            if (item == null || targetItem == null)
             {
-                Debug.LogWarning($"[ItemWheel] No item at source backpack position {fromBackpackPos}");
                 return;
             }
 
-            Debug.Log($"[ItemWheel] Source item: {item.DisplayName} at backpack[{fromBackpackPos}]");
-
-            // 🆕 检查目标位置是否有物品 - 只有双方都有物品才能交换
-            if (toBackpackPos == -1)
-            {
-                Debug.LogWarning($"[ItemWheel] Target wheel position {toWheelPos} is empty, swap not allowed");
-                return;  // 🚫 不允许与空格子交换
-            }
-
-            // 获取目标物品
-            var targetItem = _inventory.GetItemAt(toBackpackPos);
-            if (targetItem == null)
-            {
-                Debug.LogWarning($"[ItemWheel] Target backpack position {toBackpackPos} is empty, swap not allowed");
-                return;  // 🚫 不允许与空格子交换
-            }
-
-            Debug.Log($"[ItemWheel] Target item: {targetItem.DisplayName} at backpack[{toBackpackPos}]");
+            Debug.Log($"[轮盘] {wheel.Category} 拖拽交换: 轮盘{fromWheelPos}↔{toWheelPos}, 背包{fromBackpackPos}({item.DisplayName})↔{toBackpackPos}({targetItem.DisplayName})");
 
             // 设置标志，防止递归：背包变化不应该再次触发轮盘更新
             _isPerformingSwap = true;
 
             try
             {
-                // ══════ 情况1：两个位置都有物品 - 交换背包位置 ══════
-                Debug.Log($"[ItemWheel] Both positions have items, performing swap");
-
                 // 从背包中取出两个物品
                 item.Detach();
                 targetItem.Detach();
@@ -864,33 +891,35 @@ namespace ItemWheel
                 _inventory.AddAt(targetItem, fromBackpackPos);
                 _inventory.AddAt(item, toBackpackPos);
 
-                Debug.Log($"[ItemWheel] Swapped in backpack: {item.DisplayName}@{toBackpackPos} <-> {targetItem.DisplayName}@{fromBackpackPos}");
-
                 // 更新映射关系（双向交换）
                 wheel.WheelToBackpackMapping[fromWheelPos] = toBackpackPos;
                 wheel.WheelToBackpackMapping[toWheelPos] = fromBackpackPos;
                 wheel.BackpackToWheelMapping[toBackpackPos] = fromWheelPos;
                 wheel.BackpackToWheelMapping[fromBackpackPos] = toWheelPos;
 
-                Debug.Log($"[ItemWheel] Mapping updated: wheel[{fromWheelPos}]->backpack[{toBackpackPos}], wheel[{toWheelPos}]->backpack[{fromBackpackPos}]");
+                // 🆕 选中状态跟随物品移动
+                if (wheel.LastConfirmedIndex == fromWheelPos)
+                {
+                    wheel.LastConfirmedIndex = toWheelPos;
+                    Debug.Log($"[轮盘] 选中跟随: {fromWheelPos} -> {toWheelPos}");
+                }
+                else if (wheel.LastConfirmedIndex == toWheelPos)
+                {
+                    wheel.LastConfirmedIndex = fromWheelPos;
+                    Debug.Log($"[轮盘] 选中跟随: {toWheelPos} -> {fromWheelPos}");
+                }
 
-                Debug.Log($"[ItemWheel] ✓ Swap completed successfully");
+                Debug.Log($"[轮盘] 背包交换完成");
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[ItemWheel] ✗ Failed to sync backpack: {ex.Message}");
-                Debug.LogError($"[ItemWheel] Stack trace: {ex.StackTrace}");
+                Debug.LogError($"[轮盘] ✗ 背包交换失败: {ex.Message}");
             }
             finally
             {
-                // 重置标志，恢复正常事件处理
                 _isPerformingSwap = false;
-                Debug.Log($"[ItemWheel] Swap flag reset");
             }
 
-            Debug.Log($"[ItemWheel] ═══════ OnWheelSlotsSwapped End ═══════");
-
-            // 🆕 交换后保存映射
             SaveAllMappings();
         }
 

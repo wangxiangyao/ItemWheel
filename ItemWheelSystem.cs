@@ -319,6 +319,11 @@ namespace ItemWheel
         /// <param name="category">物品类别</param>
         private void UseShortcutDirect(ItemWheelCategory category)
         {
+            // 近战（V）：禁用短按，避免与近战轮盘逻辑冲突
+            if (category == ItemWheelCategory.Melee)
+            {
+                return;
+            }
             if (!_wheels.TryGetValue(category, out var wheel))
             {
                 return;  // 轮盘还未创建，忽略

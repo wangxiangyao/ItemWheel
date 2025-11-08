@@ -21,7 +21,8 @@ namespace ItemWheel
             Medical = 0,
             Stim = 1,
             Food = 2,
-            Explosive = 3
+            Explosive = 3,
+            Melee = 4
         }
 
         // 删除AllCategories数组，未使用
@@ -33,7 +34,7 @@ namespace ItemWheel
                 { "Injector", ItemWheelCategory.Stim },
                 { "Food", ItemWheelCategory.Food },
                 { "Explosive", ItemWheelCategory.Explosive },
-                { "MeleeWeapon", ItemWheelCategory.Explosive }
+                { "MeleeWeapon", ItemWheelCategory.Melee }
             };
 
         private sealed class CategoryWheel
@@ -626,8 +627,8 @@ namespace ItemWheel
                 }
             }
 
-            // 更新快捷栏UI
-            if (wheel.LastConfirmedIndex >= 0)
+            // 更新快捷栏UI（近战不更新官方快捷栏，避免错位）
+            if (wheel.LastConfirmedIndex >= 0 && wheel.Category != ItemWheelCategory.Melee)
             {
                 var shortcutIndex = (int)wheel.Category;
                 Duckov.ItemShortcut.Set(shortcutIndex, slotBuffer[wheel.LastConfirmedIndex]);
@@ -705,8 +706,12 @@ namespace ItemWheel
 
             if (selectedIndex >= 0 && selectedIndex < wheel.Slots.Length && wheel.Slots[selectedIndex] != null)
             {
-                var shortcutIndex = (int)wheel.Category;
-                Duckov.ItemShortcut.Set(shortcutIndex, wheel.Slots[selectedIndex]);
+                // 同步官方快捷栏（近战不更新官方快捷栏）
+                if (wheel.Category != ItemWheelCategory.Melee)
+                {
+                    var shortcutIndex = (int)wheel.Category;
+                    Duckov.ItemShortcut.Set(shortcutIndex, wheel.Slots[selectedIndex]);
+                }
                 Debug.Log($"[轮盘] {wheel.Category} 点击选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName}");
             }
         }
@@ -806,6 +811,7 @@ namespace ItemWheel
                     TryUseItemDirectly(item, character);
                     break;
                 case ItemWheelCategory.Explosive:
+                case ItemWheelCategory.Melee:
                     EquipItemToHand(item, character);
                     break;
                 default:

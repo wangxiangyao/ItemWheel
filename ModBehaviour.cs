@@ -79,6 +79,40 @@ namespace ItemWheel
                 return Forward(context, 3);
             }
 
+            /// <summary>
+            /// 近战快捷键（V）拦截：呼出/确认近战轮盘
+            /// </summary>
+            [HarmonyPatch("OnPlayerSwitchItemAgentMelee")]
+            [HarmonyPrefix]
+            private static bool OnPlayerSwitchItemAgentMelee_Prefix(InputAction.CallbackContext context)
+            {
+                if (_instance == null)
+                {
+                    return true;
+                }
+
+                try
+                {
+                    if (context.started || (context.performed && !context.canceled))
+                    {
+                        _instance._wheelSystem.OnKeyPressed(ItemWheelSystem.ItemWheelCategory.Melee);
+                    }
+
+                    if (context.canceled)
+                    {
+                        _instance._wheelSystem.OnKeyReleased(ItemWheelSystem.ItemWheelCategory.Melee);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ItemWheel] 处理近战快捷键失败: {ex}");
+                    return true;
+                }
+
+                // 阻止原方法，避免与官方近战切换逻辑冲突
+                return false;
+            }
+
             private static bool Forward(InputAction.CallbackContext context, int shortcutIndex)
             {
                 var instance = _instance;

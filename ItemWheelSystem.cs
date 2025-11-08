@@ -210,6 +210,8 @@ namespace ItemWheel
                 wheel.Wheel.SetSelectedIndex(wheel.LastConfirmedIndex);
             }
 
+            // 新一轮显示，重置“本次是否交换”标记
+            _sessionSwapped[category] = false;
             wheel.Wheel.Show();
             return true;
         }
@@ -255,6 +257,8 @@ namespace ItemWheel
         }
 
         private readonly Dictionary<ItemWheelCategory, KeyState> _keyStates = new();
+        // 本次显示期间是否发生过交换（会话级，按类别记录）
+        private readonly Dictionary<ItemWheelCategory, bool> _sessionSwapped = new();
 
         /// <summary>
         /// 按键按下事件（由ModBehavior调用）
@@ -401,7 +405,16 @@ namespace ItemWheel
         {
             if (_wheels.TryGetValue(category, out var wheel))
             {
-                wheel.Wheel?.ManualConfirm();
+                // 若本次显示期间发生过交换，关闭时不使用物品，直接取消
+                if (_sessionSwapped.TryGetValue(category, out bool swapped) && swapped)
+                {
+                    Debug.Log($"[轮盘] 本次发生过交换，关闭时取消选择: {category}");
+                    wheel.Wheel?.ManualCancel();
+                }
+                else
+                {
+                    wheel.Wheel?.ManualConfirm();
+                }
             }
         }
 
@@ -543,6 +556,8 @@ namespace ItemWheel
             // 🆕 订阅槽位交换事件：当玩家在轮盘上拖拽物品时，同步到背包
             wheel.EventBus.OnSlotsSwapped += (fromIndex, toIndex) =>
             {
+                // 标记本次显示期间发生过交换，用于关闭时防误触
+                _sessionSwapped[context.Category] = true;
                 OnWheelSlotsSwapped(context, fromIndex, toIndex);
             };
 

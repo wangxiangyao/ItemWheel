@@ -27,7 +27,6 @@ namespace ItemWheel
 
             _wheelSystem = new ItemWheelSystem();
 
-
             _harmony = new Harmony("com.duckov.itemwheel");
             _harmony.PatchAll(typeof(ModBehaviour).Assembly);
         }
@@ -79,9 +78,6 @@ namespace ItemWheel
                 return Forward(context, 3);
             }
 
-            /// <summary>
-            /// 近战快捷键（V）拦截：呼出/确认近战轮盘
-            /// </summary>
             [HarmonyPatch("OnPlayerSwitchItemAgentMelee")]
             [HarmonyPrefix]
             private static bool OnPlayerSwitchItemAgentMelee_Prefix(InputAction.CallbackContext context)
@@ -115,7 +111,6 @@ namespace ItemWheel
 
             private static bool Forward(InputAction.CallbackContext context, int shortcutIndex)
             {
-                var instance = _instance;
                 if (_instance == null)
                 {
                     return true;
@@ -132,10 +127,6 @@ namespace ItemWheel
                 }
             }
 
-            /// <summary>
-            /// Patch 鼠标触发输入（左键点击/开火）
-            /// 当轮盘显示时，清除触发标志，防止游戏开火
-            /// </summary>
             [HarmonyPatch("OnPlayerTriggerInputUsingMouseKeyboard")]
             [HarmonyPostfix]
             private static void OnPlayerTriggerInputPostfix(CharacterInputControl __instance)
@@ -145,7 +136,6 @@ namespace ItemWheel
                 {
                     try
                     {
-                        // 使用反射清除私有字段
                         var type = typeof(CharacterInputControl);
 
                         var field1 = type.GetField("mouseKeyboardTriggerInputThisFrame",
@@ -167,15 +157,11 @@ namespace ItemWheel
                 }
             }
 
-            /// <summary>
-            /// Patch 鼠标滚轮输入
-            /// 当轮盘显示时，阻止鼠标滚轮（防止切换武器）
-            /// </summary>
             [HarmonyPatch("OnMouseScollerInput")]
             [HarmonyPrefix]
             private static bool OnMouseScrollerInputPrefix(InputAction.CallbackContext context)
             {
-                // 当轮盘显示时，阻止鼠标滚轮输入
+                // 当轮盘显示时，阻止鼠标滚轮输入（防止切换武器）
                 if (_instance?._wheelSystem?.HasActiveWheel == true)
                 {
                     return false;  // 阻止原方法执行
@@ -185,47 +171,34 @@ namespace ItemWheel
             }
         }
 
-        /// <summary>
-        /// 处理快捷键输入
-        /// 拦截官方快捷键，转发给轮盘系统处理
-        /// </summary>
         private bool HandleShortcutContext(int shortcutIndex, InputAction.CallbackContext context)
         {
-            // 根据快捷键索引获取对应的物品类别
             var category = GetItemCategoryForShortcut(shortcutIndex);
 
             if (context.started || (context.performed && !context.canceled))
             {
-                // 按键按下：通知轮盘系统开始监听长按
                 _wheelSystem.OnKeyPressed(category);
             }
 
             if (context.canceled)
             {
-                // 按键松开：通知轮盘系统结束监听
                 _wheelSystem.OnKeyReleased(category);
             }
 
-            // 阻止游戏默认的快捷键行为
             return false;
         }
 
-        /// <summary>
-        /// 根据快捷键索引获取物品类别
-        /// 这对应游戏的快捷键设置：3=医疗, 4=刺激剂, 5=食物, 6=爆炸物
-        /// </summary>
         private static ItemWheelSystem.ItemWheelCategory GetItemCategoryForShortcut(int shortcutIndex)
         {
             return shortcutIndex switch
             {
-                0 => ItemWheelSystem.ItemWheelCategory.Medical,   // 官方快捷键3
-                1 => ItemWheelSystem.ItemWheelCategory.Stim,      // 官方快捷键4
-                2 => ItemWheelSystem.ItemWheelCategory.Food,      // 官方快捷键5
-                3 => ItemWheelSystem.ItemWheelCategory.Explosive, // 官方快捷键6
+                0 => ItemWheelSystem.ItemWheelCategory.Medical,
+                1 => ItemWheelSystem.ItemWheelCategory.Stim,
+                2 => ItemWheelSystem.ItemWheelCategory.Food,
+                3 => ItemWheelSystem.ItemWheelCategory.Explosive,
                 _ => ItemWheelSystem.ItemWheelCategory.Medical
             };
         }
-
-      
     }
 }
+

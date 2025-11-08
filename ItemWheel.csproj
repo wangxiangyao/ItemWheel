@@ -26,10 +26,7 @@
     <Compile Include="..\QuickWheel\src\**\*.cs" />
   </ItemGroup>
   
-  <!-- 排除旧的 ModBehaviour（编码损坏），使用新的 ModBehaviour2.cs 代替 -->
-  <ItemGroup>
-    <Compile Remove="ModBehaviour.cs" />
-  </ItemGroup>
+  <!-- 入口类：ModBehaviour（保持默认编译） -->
 
   <ItemGroup Condition="'$(DuckovPath)' != ''">
     <Reference Include="$(DuckovPath)\Duckov_Data\Managed\TeamSoda.*">

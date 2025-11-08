@@ -30,7 +30,8 @@ namespace ItemWheel
         {
             if (_overrideTint.HasValue) return _overrideTint;
             if (_item == null) return null;
-            return RarityColorProvider.GetTintByQuality(_item.Quality);
+            // 使用整数 Quality 并整体降一级映射，保证与游戏现状一致
+            return RarityColorProvider.GetTextColorByQualityDegraded(_item.Quality);
         }
 
         public string GetRightText()
@@ -58,4 +59,3 @@ namespace ItemWheel
         public bool RightAlign() => _rightAlign;
     }
 }
-

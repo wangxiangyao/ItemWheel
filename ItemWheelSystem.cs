@@ -540,6 +540,7 @@ namespace ItemWheel
                     cfg.EnablePersistence = false;
                     cfg.GridCellSize = 90f;  // 格子大小（像素）
                     cfg.GridSpacing = 12f;   // 格子间距（像素）
+                    cfg.DeadZoneRadius = 40f; // 死区半径（像素）
 
                     // 使用自定义格子Sprite
                     cfg.SlotNormalSprite = _slotNormalSprite;

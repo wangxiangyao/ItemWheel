@@ -115,6 +115,7 @@ namespace ItemWheel
                     cfg.EnablePersistence = false;
                     cfg.GridCellSize = 90f;
                     cfg.GridSpacing = 12f;
+                    cfg.DeadZoneRadius = 40f; // 死区半径（像素）
                     cfg.SlotNormalSprite = _slotNormalSprite;
                     cfg.SlotHoverSprite = _slotHoverSprite;
                     cfg.SlotSelectedSprite = _slotSelectedSprite;

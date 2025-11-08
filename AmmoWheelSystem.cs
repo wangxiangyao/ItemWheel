@@ -38,6 +38,7 @@ namespace ItemWheel
         private Item[] _slots = Array.Empty<Item>();
 
         private readonly Dictionary<int, Item> _typeToItem = new Dictionary<int, Item>();
+        private Dictionary<int, int> _bulletTypeCounts = new Dictionary<int, int>();
 
         // 关闭与回调防抖
         private bool _isClosing;
@@ -118,7 +119,7 @@ namespace ItemWheel
                     cfg.SlotHoverSprite = _slotHoverSprite;
                     cfg.SlotSelectedSprite = _slotSelectedSprite;
                 })
-                .WithAdapter(new ItemWheelAdapter())
+                .WithAdapter(new BulletWheelAdapter(_bulletTypeCounts))
                 .WithView(_view)
                 .WithInput(_input)
                 .WithSelectionStrategy(new GridSelectionStrategy())
@@ -209,6 +210,11 @@ namespace ItemWheel
 
             // 仅收集与当前枪口径匹配的子弹类型
             var dict = gun.GunItemSetting.GetBulletTypesInInventory(inventory);
+            _bulletTypeCounts.Clear();
+            foreach (var kv in dict)
+            {
+                _bulletTypeCounts[kv.Key] = kv.Value.count;
+            }
             if (dict == null || dict.Count == 0)
             {
                 _slots = new Item[WheelConfig.SLOT_COUNT];

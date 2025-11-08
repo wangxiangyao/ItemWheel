@@ -1,6 +1,7 @@
 using ItemStatsSystem;
 using QuickWheel.Core.Interfaces;
 using QuickWheel.Utils;
+using UnityEngine;
 
 namespace ItemWheel
 {
@@ -16,12 +17,8 @@ namespace ItemWheel
                 return null;
             }
 
-            return new WheelItemWrapper
-            {
-                Icon = item.Icon,
-                DisplayName = item.DisplayName,
-                IsValid = !string.IsNullOrEmpty(item.DisplayName)
-            };
+            // 返回带装饰的包装，支持稀有度/堆叠数量/耐久
+            return new WheelItemWithDecor(item);
         }
 
         public Item FromWheelItem(IWheelItem item)

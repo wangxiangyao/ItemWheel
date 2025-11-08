@@ -147,6 +147,21 @@ namespace ItemWheel
             }
             return result;
         }
+
+        /// <summary>
+        /// 将指定条件的情绪计数归零（恢复到平静/中性）。
+        /// </summary>
+        public static void Reset(HintCondition condition)
+        {
+            _conditionCounts[condition] = 0;
+        }
+
+        /// <summary>
+        /// 重置所有条件的情绪计数。
+        /// </summary>
+        public static void ResetAll()
+        {
+            _conditionCounts.Clear();
+        }
     }
 }
-

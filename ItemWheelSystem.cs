@@ -804,6 +804,12 @@ namespace ItemWheel
             if (item?.UsageUtilities != null && item.UsageUtilities.IsUsable(item, character))
             {
                 character.UseItem(item);
+                // 使用成功（满足 IsUsable）后，重置“不可使用”情绪计数回到平静
+                try
+                {
+                    ConditionHintManager.Reset(ConditionHintManager.HintCondition.ItemNotUsable);
+                }
+                catch { }
             }
             else
             {

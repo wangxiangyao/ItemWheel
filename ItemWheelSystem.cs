@@ -808,10 +808,10 @@ namespace ItemWheel
             else
             {
                 Debug.Log($"[ItemWheel] Item {item?.DisplayName ?? "null"} cannot be used directly.");
-                // 显示不可使用提示（可复用给语音轮盘等）
+                // 使用条件化提示：多套文案 + 情绪升级 + 轮换
                 try
                 {
-                    BubbleNotifier.ShowItemNotUsable(item?.DisplayName ?? "当前物品");
+                    ConditionHintManager.ShowItemNotUsable(item?.DisplayName ?? "该物品");
                 }
                 catch (System.Exception e)
                 {

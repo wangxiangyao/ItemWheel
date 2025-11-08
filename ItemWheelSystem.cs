@@ -725,10 +725,7 @@ namespace ItemWheel
                         var item = wheel.Slots[selectedIndex];
                         if (character != null && item != null)
                         {
-                            if (character.CurrentHoldItemAgent == null || character.CurrentHoldItemAgent.Item != item)
-                            {
-                                EquipItemToHand(item, character);
-                            }
+                            EquipMeleeItem(item, character);
                         }
                     }
                     catch (Exception ex)
@@ -736,6 +733,55 @@ namespace ItemWheel
                         Debug.LogWarning($"[ItemWheel] 近战装备失败: {ex.Message}");
                     }
                 }
+            }
+        }
+
+        // 近战：将物品插入近战槽，并持有到手上；若槽内有旧物，回收到背包
+        private void EquipMeleeItem(Item item, CharacterMainControl character)
+        {
+            if (item == null || character == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var meleeSlot = character.MeleeWeaponSlot();
+                if (meleeSlot == null)
+                {
+                    EquipItemToHand(item, character);
+                    return;
+                }
+
+                // 已在槽且已持有则不重复
+                if (meleeSlot.Content == item && character.CurrentHoldItemAgent != null && character.CurrentHoldItemAgent.Item == item)
+                {
+                    return;
+                }
+
+                // 插入近战槽（自动处理从背包/其他槽脱离），取出旧物
+                Item unplugged;
+                bool plugged = meleeSlot.Plug(item, out unplugged);
+                if (!plugged)
+                {
+                    // 插入失败：兜底仅持有
+                    EquipItemToHand(item, character);
+                    return;
+                }
+
+                // 旧物回收至背包
+                if (unplugged != null)
+                {
+                    try { _inventory?.AddItem(unplugged); } catch { }
+                }
+
+                // 切换持有
+                character.ChangeHoldItem(item);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ItemWheel] EquipMeleeItem 异常: {ex.Message}");
+                try { character.ChangeHoldItem(item); } catch { }
             }
         }
 
@@ -894,8 +940,10 @@ namespace ItemWheel
                     TryUseItemDirectly(item, character);
                     break;
                 case ItemWheelCategory.Explosive:
-                case ItemWheelCategory.Melee:
                     EquipItemToHand(item, character);
+                    break;
+                case ItemWheelCategory.Melee:
+                    EquipMeleeItem(item, character);
                     break;
                 default:
                     TryUseItemDirectly(item, character);

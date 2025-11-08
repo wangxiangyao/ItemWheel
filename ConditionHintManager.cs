@@ -55,9 +55,9 @@ namespace ItemWheel
                     },
                     { Emotion.Angry, new List<string>
                         {
-                            "别再按了，{item}用不了！",
-                            "我都说了用不了{item}！",
-                            "{item}现在真的不行！",
+                            "{item}用不了。😠",
+                            "别按了，{item}用不了！(╬ﾟдﾟ)",
+                            "不行。🚫",
                         }
                     },
                 }

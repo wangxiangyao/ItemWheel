@@ -43,12 +43,11 @@ namespace ItemWheel
             public Wheel<Item> Wheel;
             public Item[] Slots;
             public int LastConfirmedIndex;
-            public QuickWheel.Input.MouseWheelInput Input;  // ✅ 保存输入处理器引用
-            public DefaultWheelView<Item> View;  // ⭐ 保存View引用用于设置中心位置
+            public QuickWheel.Input.MouseWheelInput Input;  // �?保存输入处理器引�?            public DefaultWheelView<Item> View;  // �?保存View引用用于设置中心位置
 
-            // 🆕 双向映射机制：轮盘位置 ↔ 背包位置
-            public int[] WheelToBackpackMapping;              // 轮盘位置[0-7] → 背包位置
-            public Dictionary<int, int> BackpackToWheelMapping; // 背包位置 → 轮盘位置
+            // 🆕 双向映射机制：轮盘位�?�?背包位置
+            public int[] WheelToBackpackMapping;              // 轮盘位置[0-7] �?背包位置
+            public Dictionary<int, int> BackpackToWheelMapping; // 背包位置 �?轮盘位置
 
             public CategoryWheel()
             {
@@ -73,11 +72,9 @@ namespace ItemWheel
         private static Sprite _slotHoverSprite;
         private static Sprite _slotSelectedSprite;
 
-        // 🆕 防止递归事件标志：轮盘拖拽时同步背包，避免触发背包变化事件再次更新轮盘
-        private bool _isPerformingSwap = false;
+        // 🆕 防止递归事件标志：轮盘拖拽时同步背包，避免触发背包变化事件再次更新轮�?        private bool _isPerformingSwap = false;
 
-        // 🆕 映射持久化系统
-        private static WheelMappingPersistence _mappingPersistence;
+        // 🆕 映射持久化系�?        private static WheelMappingPersistence _mappingPersistence;
 
         public ItemWheelSystem()
         {
@@ -135,8 +132,7 @@ namespace ItemWheel
         /// </summary>
         private static void InitializePersistence()
         {
-            if (_mappingPersistence != null) return;  // 已经初始化过了
-
+            if (_mappingPersistence != null) return;  // 已经初始化过�?
             try
             {
                 // 获取Mod目录路径
@@ -147,8 +143,7 @@ namespace ItemWheel
                 _mappingPersistence = new WheelMappingPersistence(modPath);
                 Debug.Log("[ItemWheel] Mapping persistence initialized");
 
-                // 检查是否有保存的映射
-                if (_mappingPersistence.HasSavedMappings())
+                // 检查是否有保存的映�?                if (_mappingPersistence.HasSavedMappings())
                 {
                     Debug.Log("[ItemWheel] Found saved wheel mappings");
                 }
@@ -164,8 +159,7 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 检查是否有活跃的轮盘
-        /// </summary>
+        /// 检查是否有活跃的轮�?        /// </summary>
         public bool HasActiveWheel
         {
             get
@@ -180,8 +174,7 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 显示指定类别的轮盘
-        /// </summary>
+        /// 显示指定类别的轮�?        /// </summary>
         /// <param name="category">物品类别</param>
         /// <param name="wheelCenter">轮盘中心位置（可选，为null则使用当前鼠标位置）</param>
         /// <returns>是否成功显示</returns>
@@ -190,8 +183,7 @@ namespace ItemWheel
             var wheel = EnsureWheel(category);
             bool isFirstLoad = wheel.Slots == null || wheel.Slots.All(s => s == null);
 
-            // 打开轮盘时不重置选择，保持之前选中的物品
-            if (!RefreshCategorySlots(wheel, reloadFromFile: isFirstLoad, resetSelection: false))
+            // 打开轮盘时不重置选择，保持之前选中的物�?            if (!RefreshCategorySlots(wheel, reloadFromFile: isFirstLoad, resetSelection: false))
             {
                 Debug.LogWarning($"[轮盘] 刷新失败: {category}");
                 return false;
@@ -211,21 +203,18 @@ namespace ItemWheel
                 wheel.Wheel.SetSelectedIndex(wheel.LastConfirmedIndex);
             }
 
-            // 新一轮显示，重置“本次是否交换”标记
-            _sessionSwapped[category] = false;
+            // 新一轮显示，重置“本次是否交换”标�?            _sessionSwapped[category] = false;
             wheel.Wheel.Show();
             return true;
         }
 
         /// <summary>
-        /// 隐藏所有轮盘
-        /// </summary>
+        /// 隐藏所有轮�?        /// </summary>
         public void HideAllWheels()
         {
             foreach (var wheel in _wheels.Values)
             {
-                wheel.Input?.SetPressedState(false);  // 重置输入状态
-                wheel.Wheel?.ManualCancel();
+                wheel.Input?.SetPressedState(false);  // 重置输入状�?                wheel.Wheel?.ManualCancel();
             }
 
             // 兜底：全局清理任意残留的拖拽状态，防止自投/异常导致的拖拽幽灵与 hover 卡住
@@ -247,8 +236,7 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 按键状态管理
-        /// </summary>
+        /// 按键状态管�?        /// </summary>
         private sealed class KeyState
         {
             public bool IsPressed;
@@ -262,9 +250,7 @@ namespace ItemWheel
         private readonly Dictionary<ItemWheelCategory, bool> _sessionSwapped = new();
 
         /// <summary>
-        /// 按键按下事件（由ModBehavior调用）
-        /// 开始长按计时
-        /// </summary>
+        /// 按键按下事件（由ModBehavior调用�?        /// 开始长按计�?        /// </summary>
         /// <param name="category">物品类别</param>
         public void OnKeyPressed(ItemWheelCategory category)
         {
@@ -277,15 +263,14 @@ namespace ItemWheel
             state.IsPressed = true;
             state.HoldTime = 0f;
             state.HasTriggeredWheel = false;
-            state.PressedMousePosition = UnityEngine.Input.mousePosition;  // ⭐ 立即记录鼠标位置
+            state.PressedMousePosition = UnityEngine.Input.mousePosition;  // �?立即记录鼠标位置
 
             // 确保轮盘存在（预热）
             EnsureWheel(category);
         }
 
         /// <summary>
-        /// 按键松开事件（由ModBehavior调用）
-        /// 根据长按状态决定执行逻辑
+        /// 按键松开事件（由ModBehavior调用�?        /// 根据长按状态决定执行逻辑
         /// </summary>
         /// <param name="category">物品类别</param>
         public void OnKeyReleased(ItemWheelCategory category)
@@ -304,12 +289,10 @@ namespace ItemWheel
             }
             else
             {
-                // 短按：直接使用物品
-                UseShortcutDirect(category);
+                // 短按：直接使用物�?                UseShortcutDirect(category);
             }
 
-            // 重置状态
-            state.HoldTime = 0f;
+            // 重置状�?            state.HoldTime = 0f;
             state.HasTriggeredWheel = false;
         }
 
@@ -321,12 +304,10 @@ namespace ItemWheel
         {
             if (!_wheels.TryGetValue(category, out var wheel))
             {
-                return;  // 轮盘还未创建，忽略
-            }
+                return;  // 轮盘还未创建，忽�?            }
 
             // 短按不应触发重排/重建布局，避免快捷键UI变化
-            // 仅在首次未初始化时刷新一次（并且不重置选择）
-            if (wheel.Slots == null || wheel.Slots.All(s => s == null))
+            // 仅在首次未初始化时刷新一次（并且不重置选择�?            if (wheel.Slots == null || wheel.Slots.All(s => s == null))
             {
                 if (!RefreshCategorySlots(wheel, reloadFromFile: false, resetSelection: false))
                 {
@@ -351,22 +332,19 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 每帧更新方法（处理长按计时和轮盘逻辑）
-        /// </summary>
+        /// 每帧更新方法（处理长按计时和轮盘逻辑�?        /// </summary>
         public void Update()
         {
             // 处理长按计时
             HandleLongPressTimers();
 
-            // 更新可见的轮盘（包括鼠标输入）
-            if (HasActiveWheel)
+            // 更新可见的轮盘（包括鼠标输入�?            if (HasActiveWheel)
             {
                 foreach (var wheel in _wheels.Values)
                 {
                     if (wheel.Wheel != null && wheel.Wheel.IsVisible)
                     {
-                        // Wheel.Update()内部会调用InputHandler.OnUpdate()，不需要重复调用
-                        wheel.Wheel.Update();
+                        // Wheel.Update()内部会调用InputHandler.OnUpdate()，不需要重复调�?                        wheel.Wheel.Update();
                     }
                 }
             }
@@ -393,8 +371,7 @@ namespace ItemWheel
                     {
                         // 达到长按阈值，显示轮盘
                         state.HasTriggeredWheel = true;
-                        ShowWheel(category, state.PressedMousePosition);  // ⭐ 传递按下时的鼠标位置
-                    }
+                        ShowWheel(category, state.PressedMousePosition);  // �?传递按下时的鼠标位�?                    }
                 }
             }
         }
@@ -434,16 +411,13 @@ namespace ItemWheel
             foreach (CategoryWheel categoryWheel in _wheels.Values)
             {
                 categoryWheel.Wheel?.Dispose();
-                // Input处理器由Wheel管理，不需要单独释放
-            }
+                // Input处理器由Wheel管理，不需要单独释�?            }
 
             _wheels.Clear();
         }
 
         /// <summary>
-        /// 关卡初始化事件处理
-        /// 绑定主角色并重置轮盘状态
-        /// </summary>
+        /// 关卡初始化事件处�?        /// 绑定主角色并重置轮盘状�?        /// </summary>
         private void HandleLevelInitialized()
         {
             var mainCharacter = CharacterMainControl.Main;
@@ -481,8 +455,7 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 🆕 背包内容变化事件处理器
-        /// 当背包中物品位置变化时，刷新轮盘映射
+        /// 🆕 背包内容变化事件处理�?        /// 当背包中物品位置变化时，刷新轮盘映射
         /// </summary>
         private void OnInventoryContentChanged(Inventory inventory, int changedSlot)
         {
@@ -497,8 +470,7 @@ namespace ItemWheel
 
             foreach (var kvp in _wheels)
             {
-                // 背包变化时重置选择为第一个
-                RefreshCategorySlots(kvp.Value, reloadFromFile: false, resetSelection: true);
+                // 背包变化时重置选择为第一�?                RefreshCategorySlots(kvp.Value, reloadFromFile: false, resetSelection: true);
             }
         }
 
@@ -522,12 +494,11 @@ namespace ItemWheel
                 Category = category,
                 Slots = new Item[WheelConfig.SLOT_COUNT],
                 LastConfirmedIndex = -1
-                // ShowPosition 已删除，不再需要
-            };
+                // ShowPosition 已删除，不再需�?            };
 
-            // ✅ 使用简化的MouseWheelInput，只处理鼠标移动
+            // �?使用简化的MouseWheelInput，只处理鼠标移动
             var input = new QuickWheel.Input.MouseWheelInput();
-            var view = new DefaultWheelView<Item>();  // ⭐ 创建View实例
+            var view = new DefaultWheelView<Item>();  // �?创建View实例
 
             Wheel<Item> wheel = new WheelBuilder<Item>()
                 .WithConfig(cfg =>
@@ -542,28 +513,24 @@ namespace ItemWheel
                     cfg.SlotSelectedSprite = _slotSelectedSprite;
                 })
                 .WithAdapter(new ItemWheelAdapter())
-                .WithView(view)  // ⭐ 使用创建的View实例
-                .WithInput(input)  // ✨ 只处理鼠标移动，不处理按键
-                .WithSelectionStrategy(new GridSelectionStrategy())
+                .WithView(view)  // �?使用创建的View实例
+                .WithInput(input)  // �?只处理鼠标移动，不处理按�?                .WithSelectionStrategy(new GridSelectionStrategy())
                 .OnItemSelected((index, item) => OnItemSelected(context, index, item))
                 .OnWheelHidden(index => OnWheelHidden(context, index))
                 .Build();
 
             context.Wheel = wheel;
-            context.Input = input;  // ✅ 保存输入处理器引用
-            context.View = view;    // ⭐ 保存View引用
+            context.Input = input;  // �?保存输入处理器引�?            context.View = view;    // �?保存View引用
             wheel.SetSlots(context.Slots);
 
-            // 🆕 订阅槽位交换事件：当玩家在轮盘上拖拽物品时，同步到背包
-            wheel.EventBus.OnSlotsSwapped += (fromIndex, toIndex) =>
+            // 🆕 订阅槽位交换事件：当玩家在轮盘上拖拽物品时，同步到背�?            wheel.EventBus.OnSlotsSwapped += (fromIndex, toIndex) =>
             {
                 // 标记本次显示期间发生过交换，用于关闭时防误触
                 _sessionSwapped[context.Category] = true;
                 OnWheelSlotsSwapped(context, fromIndex, toIndex);
             };
 
-            // 🆕 订阅选中改变事件：直接订阅 Wheel 的事件（绕过 EventBus 的事件锁）
-            wheel.OnSelectionChanged += (selectedIndex) =>
+            // 🆕 订阅选中改变事件：直接订�?Wheel 的事件（绕过 EventBus 的事件锁�?            wheel.OnSelectionChanged += (selectedIndex) =>
             {
                 OnSelectionChanged(context, selectedIndex);
             };
@@ -617,20 +584,17 @@ namespace ItemWheel
             // 根据 resetSelection 参数决定是否重置选择
             if (resetSelection)
             {
-                // 背包变化时：总是选择第一个
-                wheel.LastConfirmedIndex = GetFirstAvailableIndex(slotBuffer);
+                // 背包变化时：总是选择第一�?                wheel.LastConfirmedIndex = GetFirstAvailableIndex(slotBuffer);
             }
             else
             {
-                // 只是打开轮盘时：如果之前的选择还存在就保持，否则选第一个
-                if (wheel.LastConfirmedIndex < 0 || wheel.LastConfirmedIndex >= slotBuffer.Length || slotBuffer[wheel.LastConfirmedIndex] == null)
+                // 只是打开轮盘时：如果之前的选择还存在就保持，否则选第一�?                if (wheel.LastConfirmedIndex < 0 || wheel.LastConfirmedIndex >= slotBuffer.Length || slotBuffer[wheel.LastConfirmedIndex] == null)
                 {
                     wheel.LastConfirmedIndex = GetFirstAvailableIndex(slotBuffer);
                 }
             }
 
-            // 更新快捷栏UI（近战不更新官方快捷栏，避免错位）
-            if (wheel.LastConfirmedIndex >= 0 && wheel.Category != ItemWheelCategory.Melee)
+            // 更新快捷栏UI（近战不更新官方快捷栏，避免错位�?            if (wheel.LastConfirmedIndex >= 0 && wheel.Category != ItemWheelCategory.Melee)
             {
                 var shortcutIndex = (int)wheel.Category;
                 Duckov.ItemShortcut.Set(shortcutIndex, slotBuffer[wheel.LastConfirmedIndex]);
@@ -674,8 +638,7 @@ namespace ItemWheel
             return GetFirstAvailableIndex(wheel.Slots);
         }
 
-        // 删除UpdateHover方法，QuickWheel自己管理hover状态
-
+        // 删除UpdateHover方法，QuickWheel自己管理hover状�?
         private void OnItemSelected(CategoryWheel wheel, int index, Item item)
         {
             if (wheel == null)
@@ -697,8 +660,7 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 🆕 处理选中索引改变事件：更新快捷栏UI（不使用物品）
-        /// 参考 backpack_quickwheel 的 ChangeSelection 模式
+        /// 🆕 处理选中索引改变事件：更新快捷栏UI（不使用物品�?        /// 参�?backpack_quickwheel �?ChangeSelection 模式
         /// </summary>
         private void OnSelectionChanged(CategoryWheel wheel, int selectedIndex)
         {
@@ -708,78 +670,17 @@ namespace ItemWheel
 
             if (selectedIndex >= 0 && selectedIndex < wheel.Slots.Length && wheel.Slots[selectedIndex] != null)
             {
-                // 同步官方快捷栏（近战不更新官方快捷栏）
-                if (wheel.Category != ItemWheelCategory.Melee)
+                // 同步官方快捷栏（近战不更新官方快捷栏�?                if (wheel.Category != ItemWheelCategory.Melee)
                 {
                     var shortcutIndex = (int)wheel.Category;
                     Duckov.ItemShortcut.Set(shortcutIndex, wheel.Slots[selectedIndex]);
                 }
                 Debug.Log($"[轮盘] {wheel.Category} 点击选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName}");
-
-                // 近战：hover/选中即刻装备
-                if (wheel.Category == ItemWheelCategory.Melee)
-                {
-                    try
-                    {
-                        var character = CharacterMainControl.Main ?? _character;
-                        var item = wheel.Slots[selectedIndex];
-                        if (character != null && item != null)
-                        {
-                            if (character.CurrentHoldItemAgent == null || character.CurrentHoldItemAgent.Item != item)
-                            {
-                                EquipItemToHand(item, character);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning($"[ItemWheel] 近战装备失败: {ex.Message}");
-                    }
-                }
-            }
-        }
-
-        // 近战：设置默认选中为当前装备的近战（若存在且在候选中）
-        private void TrySetMeleeDefaultSelection(CategoryWheel wheel, Item[] slotBuffer)
-        {
-            if (wheel == null || wheel.Category != ItemWheelCategory.Melee || slotBuffer == null)
-            {
-                return;
-            }
-
-            try
-            {
-                var character = CharacterMainControl.Main ?? _character;
-                Item equipped = null;
-                if (character?.CurrentHoldItemAgent?.Item != null && MatchesCategory(character.CurrentHoldItemAgent.Item, ItemWheelCategory.Melee))
-                {
-                    equipped = character.CurrentHoldItemAgent.Item;
-                }
-                else
-                {
-                    var meleeSlot = character?.MeleeWeaponSlot();
-                    equipped = meleeSlot != null ? meleeSlot.Content : null;
-                }
-
-                if (equipped != null)
-                {
-                    int idx = Array.IndexOf(slotBuffer, equipped);
-                    if (idx >= 0)
-                    {
-                        wheel.LastConfirmedIndex = idx;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[ItemWheel] TrySetMeleeDefaultSelection 失败: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// 从物品栏收集指定类别的所有物品
-        /// 按照物品栏顺序收集，最多收集8个物品（中心空位）
-        /// </summary>
+        /// 从物品栏收集指定类别的所有物�?        /// 按照物品栏顺序收集，最多收�?个物品（中心空位�?        /// </summary>
         /// <param name="category">要收集的物品类别</param>
         /// <returns>物品列表</returns>
         private List<Item> CollectItemsForCategory(ItemWheelCategory category)
@@ -807,8 +708,7 @@ namespace ItemWheel
                 }
             }
 
-            // 近战：总是将角色近战槽中的武器纳入候选（避免无背包近战时刷新失败）
-            if (category == ItemWheelCategory.Melee)
+            // 近战：总是将角色近战槽中的武器纳入候选（避免无背包近战时刷新失败�?            if (category == ItemWheelCategory.Melee)
             {
                 try
                 {
@@ -825,7 +725,7 @@ namespace ItemWheel
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[ItemWheel] 收集近战槽物品失败: {ex.Message}");
+                    Debug.LogWarning($"[ItemWheel] 收集近战槽物品失�? {ex.Message}");
                 }
             }
 
@@ -833,9 +733,7 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 检查物品是否匹配指定类别
-        /// 通过物品标签映射来判断物品类别
-        /// </summary>
+        /// 检查物品是否匹配指定类�?        /// 通过物品标签映射来判断物品类�?        /// </summary>
         /// <param name="item">要检查的物品</param>
         /// <param name="category">目标类别</param>
         /// <returns>是否匹配类别</returns>
@@ -873,9 +771,7 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 使用物品的核心方法
-        /// 根据物品类别选择合适的使用方式（直接使用或装备）
-        /// </summary>
+        /// 使用物品的核心方�?        /// 根据物品类别选择合适的使用方式（直接使用或装备�?        /// </summary>
         /// <param name="item">要使用的物品</param>
         /// <param name="category">物品类别</param>
         private void UseItem(Item item, ItemWheelCategory category)
@@ -908,8 +804,7 @@ namespace ItemWheel
             if (item?.UsageUtilities != null && item.UsageUtilities.IsUsable(item, character))
             {
                 character.UseItem(item);
-                // 使用成功（满足 IsUsable）后，重置“不可使用”情绪计数回到平静
-                try
+                // 使用成功（满�?IsUsable）后，重置“不可使用”情绪计数回到平�?                try
                 {
                     ConditionHintManager.Reset(ConditionHintManager.HintCondition.ItemNotUsable);
                 }
@@ -921,7 +816,7 @@ namespace ItemWheel
                 // 使用条件化提示：多套文案 + 情绪升级 + 轮换
                 try
                 {
-                    ConditionHintManager.ShowItemNotUsable(item?.DisplayName ?? "该物品");
+                    ConditionHintManager.ShowItemNotUsable(item?.DisplayName ?? "该物�?);
                 }
                 catch (System.Exception e)
                 {
@@ -956,9 +851,8 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 🆕 处理轮盘槽位交换事件：当玩家拖拽轮盘物品时，同步到背包
-        /// 参考 MainBackpackWheelManager.OnWheelSlotsSwapped (行1247-1261)
-        /// 参考 MainBackpackWheelManager.AdjustWheelPosition (行1271-1374)
+        /// 🆕 处理轮盘槽位交换事件：当玩家拖拽轮盘物品时，同步到背�?        /// 参�?MainBackpackWheelManager.OnWheelSlotsSwapped (�?247-1261)
+        /// 参�?MainBackpackWheelManager.AdjustWheelPosition (�?271-1374)
         /// </summary>
         private void OnWheelSlotsSwapped(CategoryWheel wheel, int fromWheelPos, int toWheelPos)
         {
@@ -1016,8 +910,7 @@ namespace ItemWheel
                 wheel.BackpackToWheelMapping[toBackpackPos] = fromWheelPos;
                 wheel.BackpackToWheelMapping[fromBackpackPos] = toWheelPos;
 
-                // 🆕 选中状态跟随物品移动
-                if (wheel.LastConfirmedIndex == fromWheelPos)
+                // 🆕 选中状态跟随物品移�?                if (wheel.LastConfirmedIndex == fromWheelPos)
                 {
                     wheel.LastConfirmedIndex = toWheelPos;
                     Debug.Log($"[轮盘] 选中跟随: {fromWheelPos} -> {toWheelPos}");
@@ -1032,7 +925,7 @@ namespace ItemWheel
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[轮盘] ✗ 背包交换失败: {ex.Message}");
+                Debug.LogError($"[轮盘] �?背包交换失败: {ex.Message}");
             }
             finally
             {
@@ -1062,12 +955,10 @@ namespace ItemWheel
 
                 var savedMapping = savedMappings[wheel.Category];
 
-                // 清空旧映射
-                System.Array.Fill(wheel.WheelToBackpackMapping, -1);
+                // 清空旧映�?                System.Array.Fill(wheel.WheelToBackpackMapping, -1);
                 wheel.BackpackToWheelMapping.Clear();
 
-                // 🆕 检查是否至少有一个有效映射，如果全为-1则重新生成
-                bool hasAnyValidMapping = false;
+                // 🆕 检查是否至少有一个有效映射，如果全为-1则重新生�?                bool hasAnyValidMapping = false;
                 for (int wheelPos = 0; wheelPos < 8; wheelPos++)
                 {
                     if (savedMapping[wheelPos] >= 0)
@@ -1083,14 +974,13 @@ namespace ItemWheel
                     return false;
                 }
 
-                // 验证保存的映射 - 只要有一个映射失败就重新生成
+                // 验证保存的映�?- 只要有一个映射失败就重新生成
                 for (int wheelPos = 0; wheelPos < 8; wheelPos++)
                 {
                     int backpackPos = savedMapping[wheelPos];
                     if (backpackPos < 0) continue;  // 空位跳过
 
-                    // 验证：背包位置是否有效，且物品属于当前类别
-                    if (backpackPos >= _inventory.Content.Count)
+                    // 验证：背包位置是否有效，且物品属于当前类�?                    if (backpackPos >= _inventory.Content.Count)
                     {
                         Debug.LogWarning($"[ItemWheel] 🚨 Mapping validation failed: backpack[{backpackPos}] out of range");
                         Debug.LogWarning($"[ItemWheel] 🔄 Regenerating mapping for {wheel.Category}");
@@ -1105,8 +995,7 @@ namespace ItemWheel
                         return false;  // 🚫 一个失败就全部重新生成
                     }
 
-                    // 检查物品是否在collected列表中（属于当前类别）
-                    if (!collected.Contains(item))
+                    // 检查物品是否在collected列表中（属于当前类别�?                    if (!collected.Contains(item))
                     {
                         Debug.LogWarning($"[ItemWheel] 🚨 Mapping validation failed: backpack[{backpackPos}] item '{item.DisplayName}' not in category {wheel.Category}");
                         Debug.LogWarning($"[ItemWheel] 🔄 Regenerating mapping for {wheel.Category}");
@@ -1114,24 +1003,22 @@ namespace ItemWheel
                     }
                 }
 
-                // 所有映射都验证通过，现在应用它们
-                int validMappings = 0;
+                // 所有映射都验证通过，现在应用它�?                int validMappings = 0;
                 for (int wheelPos = 0; wheelPos < 8; wheelPos++)
                 {
                     int backpackPos = savedMapping[wheelPos];
                     if (backpackPos < 0) continue;  // 空位
 
                     var item = _inventory.GetItemAt(backpackPos);
-                    // 映射有效，应用
-                    slotBuffer[wheelPos] = item;
+                    // 映射有效，应�?                    slotBuffer[wheelPos] = item;
                     wheel.WheelToBackpackMapping[wheelPos] = backpackPos;
                     wheel.BackpackToWheelMapping[backpackPos] = wheelPos;
                     validMappings++;
 
-                    Debug.Log($"[ItemWheel] ✓ Restored mapping: wheel[{wheelPos}] <-> backpack[{backpackPos}] ({item.DisplayName})");
+                    Debug.Log($"[ItemWheel] �?Restored mapping: wheel[{wheelPos}] <-> backpack[{backpackPos}] ({item.DisplayName})");
                 }
 
-                Debug.Log($"[ItemWheel] ✅ All saved mappings validated for {wheel.Category}: {validMappings} mappings loaded");
+                Debug.Log($"[ItemWheel] �?All saved mappings validated for {wheel.Category}: {validMappings} mappings loaded");
                 return true;
             }
             catch (System.Exception ex)
@@ -1142,12 +1029,10 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 创建默认映射（按背包顺序）
-        /// </summary>
+        /// 创建默认映射（按背包顺序�?        /// </summary>
         private void CreateDefaultMapping(CategoryWheel wheel, List<Item> collected, Item[] slotBuffer)
         {
-            // 清空旧映射
-            System.Array.Fill(wheel.WheelToBackpackMapping, -1);
+            // 清空旧映�?            System.Array.Fill(wheel.WheelToBackpackMapping, -1);
             wheel.BackpackToWheelMapping.Clear();
 
             int bufferIndex = 0;
@@ -1210,9 +1095,8 @@ namespace ItemWheel
                     allMappings[category] = mappingCopy;
                 }
 
-                // 保存到文件
-                _mappingPersistence.Save(allMappings);
-                Debug.Log($"[ItemWheel] ✓ Saved mappings for {allMappings.Count} categories");
+                // 保存到文�?                _mappingPersistence.Save(allMappings);
+                Debug.Log($"[ItemWheel] �?Saved mappings for {allMappings.Count} categories");
             }
             catch (System.Exception ex)
             {
@@ -1221,3 +1105,4 @@ namespace ItemWheel
         }
     }
 }
+

@@ -50,12 +50,16 @@ namespace ItemWheel
             public int[] WheelToBackpackMapping;              // 轮盘位置[0-7] → 背包位置
             public Dictionary<int, int> BackpackToWheelMapping; // 背包位置 → 轮盘位置
 
+            // 🆕 物品来源标记：记录每个轮盘位置的物品来源（背包 vs 插槽）
+            public bool[] IsFromSlot;  // true = 来自插槽, false = 来自背包
+
             public CategoryWheel()
             {
                 // 初始化映射数据结构（8个轮盘位置）
                 WheelToBackpackMapping = new int[8];
                 System.Array.Fill(WheelToBackpackMapping, -1); // -1 表示空位
                 BackpackToWheelMapping = new Dictionary<int, int>();
+                IsFromSlot = new bool[8];  // 默认全为false（来自背包）
             }
         }
 
@@ -603,12 +607,13 @@ namespace ItemWheel
                 return false;
             }
 
-            List<Item> collected = CollectItemsForCategory(wheel.Category);
+            List<CollectedItemInfo> collected = CollectItemsForCategory(wheel.Category);
 
             if (collected.Count == 0)
             {
                 wheel.Slots = new Item[WheelConfig.SLOT_COUNT];
                 wheel.Wheel.SetSlots(wheel.Slots);
+                System.Array.Fill(wheel.IsFromSlot, false);  // 重置来源标记
                 return false;
             }
 
@@ -634,28 +639,76 @@ namespace ItemWheel
             // 根据 resetSelection 参数决定是否重置选择
             if (resetSelection)
             {
-                // 背包变化时：总是选择第一个
-                wheel.LastConfirmedIndex = GetFirstAvailableIndex(slotBuffer);
+                // 背包变化时：选择第一个可用的背包物品（跳过插槽物品）
+                wheel.LastConfirmedIndex = GetFirstAvailableBackpackItemIndex(wheel);
             }
             else
             {
-                // 只是打开轮盘时：如果之前的选择还存在就保持，否则选第一个
+                // 只是打开轮盘时：如果之前的选择还存在就保持，否则选第一个背包物品
                 if (wheel.LastConfirmedIndex < 0 || wheel.LastConfirmedIndex >= slotBuffer.Length || slotBuffer[wheel.LastConfirmedIndex] == null)
                 {
-                    wheel.LastConfirmedIndex = GetFirstAvailableIndex(slotBuffer);
+                    wheel.LastConfirmedIndex = GetFirstAvailableBackpackItemIndex(wheel);
+                }
+                else
+                {
+                    // 🆕 如果之前选中的是插槽物品，重新选择第一个背包物品
+                    if (wheel.IsFromSlot != null && wheel.IsFromSlot[wheel.LastConfirmedIndex])
+                    {
+                        wheel.LastConfirmedIndex = GetFirstAvailableBackpackItemIndex(wheel);
+                    }
                 }
             }
 
             // 更新快捷栏UI（近战不更新官方快捷栏，避免错位）
             if (wheel.LastConfirmedIndex >= 0 && wheel.Category != ItemWheelCategory.Melee)
             {
-                var shortcutIndex = (int)wheel.Category;
-                Duckov.ItemShortcut.Set(shortcutIndex, slotBuffer[wheel.LastConfirmedIndex]);
+                // 🆕 再次检查：只对背包物品更新快捷栏
+                bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[wheel.LastConfirmedIndex];
+                if (!isFromSlot)
+                {
+                    var shortcutIndex = (int)wheel.Category;
+                    Duckov.ItemShortcut.Set(shortcutIndex, slotBuffer[wheel.LastConfirmedIndex]);
+                }
             }
 
             return true;
         }
 
+        /// <summary>
+        /// 获取第一个可用的背包物品索引（跳过插槽物品和空位）
+        /// </summary>
+        private static int GetFirstAvailableBackpackItemIndex(CategoryWheel wheel)
+        {
+            if (wheel == null || wheel.Slots == null)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < wheel.Slots.Length; i++)
+            {
+                if (i == 8)
+                {
+                    continue;  // 跳过中心位置
+                }
+
+                if (wheel.Slots[i] != null)
+                {
+                    // 🆕 跳过插槽物品，只选择背包物品
+                    bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[i];
+                    if (!isFromSlot)
+                    {
+                        return i;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// （已废弃）获取第一个可用物品索引（包括插槽物品）
+        /// 保留用于兼容性，但不再使用
+        /// </summary>
         private static int GetFirstAvailableIndex(Item[] slots)
         {
             if (slots == null)
@@ -685,10 +738,16 @@ namespace ItemWheel
                 wheel.LastConfirmedIndex < wheel.Slots.Length &&
                 wheel.Slots[wheel.LastConfirmedIndex] != null)
             {
-                return wheel.LastConfirmedIndex;
+                // 🆕 检查选中的物品是否来自插槽，如果是则选择第一个背包物品
+                bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[wheel.LastConfirmedIndex];
+                if (!isFromSlot)
+                {
+                    return wheel.LastConfirmedIndex;
+                }
             }
 
-            return GetFirstAvailableIndex(wheel.Slots);
+            // 选择第一个可用的背包物品（跳过插槽物品）
+            return GetFirstAvailableBackpackItemIndex(wheel);
         }
 
         // 删除UpdateHover方法，QuickWheel自己管理hover状态
@@ -721,16 +780,28 @@ namespace ItemWheel
         {
             if (wheel == null) return;
 
-            wheel.LastConfirmedIndex = selectedIndex;
-
             if (selectedIndex >= 0 && selectedIndex < wheel.Slots.Length && wheel.Slots[selectedIndex] != null)
             {
+                // 检查是否来自插槽
+                bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[selectedIndex];
+
+                // 🆕 插槽物品不支持点击选中，只支持 hover 使用（与官方快捷栏保持一致）
+                if (isFromSlot)
+                {
+                    Debug.Log($"[轮盘] {wheel.Category} 插槽物品不可选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName} (只能hover使用)");
+                    return;
+                }
+
+                // 更新选中索引（只对背包物品）
+                wheel.LastConfirmedIndex = selectedIndex;
+
                 // 同步官方快捷栏（近战不更新官方快捷栏）
                 if (wheel.Category != ItemWheelCategory.Melee)
                 {
                     var shortcutIndex = (int)wheel.Category;
                     Duckov.ItemShortcut.Set(shortcutIndex, wheel.Slots[selectedIndex]);
                 }
+
                 Debug.Log($"[轮盘] {wheel.Category} 点击选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName}");
 
                 // 近战：hover/选中即刻装备
@@ -840,33 +911,93 @@ namespace ItemWheel
         }
 
         /// <summary>
-        /// 从物品栏收集指定类别的所有物品
+        /// 收集到的物品及其来源信息
+        /// </summary>
+        private struct CollectedItemInfo
+        {
+            public Item Item;
+            public bool IsFromSlot;  // true = 来自插槽, false = 来自背包
+            public int BackpackIndex; // 如果来自背包，记录背包位置；如果来自插槽，记录父物品的背包位置
+
+            public CollectedItemInfo(Item item, bool isFromSlot, int backpackIndex)
+            {
+                Item = item;
+                IsFromSlot = isFromSlot;
+                BackpackIndex = backpackIndex;
+            }
+        }
+
+        /// <summary>
+        /// 从物品栏收集指定类别的所有物品（包括插槽中的物品）
         /// 按照物品栏顺序收集，最多收集8个物品（中心空位）
         /// </summary>
         /// <param name="category">要收集的物品类别</param>
-        /// <returns>物品列表</returns>
-        private List<Item> CollectItemsForCategory(ItemWheelCategory category)
+        /// <returns>物品及来源信息列表</returns>
+        private List<CollectedItemInfo> CollectItemsForCategory(ItemWheelCategory category)
         {
-            var result = new List<Item>(WheelConfig.SLOT_COUNT - 1);
+            var result = new List<CollectedItemInfo>(WheelConfig.SLOT_COUNT - 1);
+            var addedItems = new HashSet<Item>();  // 防止重复添加同一物品
 
             if (_inventory?.Content == null)
             {
                 return result;
             }
 
-            // 背包中收集匹配的物品
-            foreach (Item item in _inventory.Content)
+            // 背包中收集匹配的物品（包括物品插槽中的物品）
+            for (int backpackIndex = 0; backpackIndex < _inventory.Content.Count; backpackIndex++)
             {
-                if (item == null || !MatchesCategory(item, category))
+                Item item = _inventory.Content[backpackIndex];
+                if (item == null)
                 {
                     continue;
                 }
 
-                result.Add(item);
-
-                if (result.Count >= WheelConfig.SLOT_COUNT - 1)
+                // 1. 检查背包物品本身是否匹配
+                if (MatchesCategory(item, category) && !addedItems.Contains(item))
                 {
-                    break;
+                    result.Add(new CollectedItemInfo(item, false, backpackIndex));
+                    addedItems.Add(item);
+
+                    if (result.Count >= WheelConfig.SLOT_COUNT - 1)
+                    {
+                        break;
+                    }
+                }
+
+                // 2. 🆕 检查物品的插槽中是否有匹配的物品（只搜索一层）
+                if (item.Slots != null)
+                {
+                    try
+                    {
+                        foreach (var slot in item.Slots)
+                        {
+                            if (slot == null || slot.Content == null)
+                            {
+                                continue;
+                            }
+
+                            Item slotItem = slot.Content;
+                            if (MatchesCategory(slotItem, category) && !addedItems.Contains(slotItem))
+                            {
+                                result.Add(new CollectedItemInfo(slotItem, true, backpackIndex));
+                                addedItems.Add(slotItem);
+
+                                if (result.Count >= WheelConfig.SLOT_COUNT - 1)
+                                {
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (result.Count >= WheelConfig.SLOT_COUNT - 1)
+                        {
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[ItemWheel] 搜索物品插槽失败: {item.DisplayName}, {ex.Message}");
+                    }
                 }
             }
 
@@ -880,9 +1011,11 @@ namespace ItemWheel
                     var slotItem = meleeSlot != null ? meleeSlot.Content : null;
                     if (slotItem != null && MatchesCategory(slotItem, ItemWheelCategory.Melee))
                     {
-                        if (!result.Contains(slotItem))
+                        if (!addedItems.Contains(slotItem))
                         {
-                            result.Add(slotItem);
+                            // 近战槽物品标记为来自插槽，背包索引为-1（特殊处理）
+                            result.Add(new CollectedItemInfo(slotItem, true, -1));
+                            addedItems.Add(slotItem);
                         }
                     }
                 }
@@ -1039,6 +1172,16 @@ namespace ItemWheel
                 return;
             }
 
+            // 🆕 检查是否有插槽物品参与交换，如果有则禁止
+            if (wheel.IsFromSlot != null)
+            {
+                if (wheel.IsFromSlot[fromWheelPos] || wheel.IsFromSlot[toWheelPos])
+                {
+                    Debug.LogWarning($"[轮盘] ⚠️ 禁止拖拽插槽物品: from={fromWheelPos}(slot={wheel.IsFromSlot[fromWheelPos]}), to={toWheelPos}(slot={wheel.IsFromSlot[toWheelPos]})");
+                    return;
+                }
+            }
+
             if (wheel.WheelToBackpackMapping == null || wheel.BackpackToWheelMapping == null)
             {
                 return;
@@ -1110,7 +1253,7 @@ namespace ItemWheel
         /// <summary>
         /// 尝试加载保存的映射并应用
         /// </summary>
-        private bool TryLoadSavedMapping(CategoryWheel wheel, List<Item> collected, Item[] slotBuffer)
+        private bool TryLoadSavedMapping(CategoryWheel wheel, List<CollectedItemInfo> collected, Item[] slotBuffer)
         {
             if (_mappingPersistence == null || !_mappingPersistence.HasSavedMappings())
             {
@@ -1130,6 +1273,7 @@ namespace ItemWheel
                 // 清空旧映射
                 System.Array.Fill(wheel.WheelToBackpackMapping, -1);
                 wheel.BackpackToWheelMapping.Clear();
+                System.Array.Fill(wheel.IsFromSlot, false);
 
                 // 🆕 检查是否至少有一个有效映射，如果全为-1则重新生成
                 bool hasAnyValidMapping = false;
@@ -1170,10 +1314,20 @@ namespace ItemWheel
                         return false;  // 🚫 一个失败就全部重新生成
                     }
 
-                    // 检查物品是否在collected列表中（属于当前类别）
-                    if (!collected.Contains(item))
+                    // 检查物品是否在collected列表中（属于当前类别），且来自背包而非插槽
+                    bool foundInCollected = false;
+                    foreach (var itemInfo in collected)
                     {
-                        Debug.LogWarning($"[ItemWheel] 🚨 Mapping validation failed: backpack[{backpackPos}] item '{item.DisplayName}' not in category {wheel.Category}");
+                        if (itemInfo.Item == item && !itemInfo.IsFromSlot && itemInfo.BackpackIndex == backpackPos)
+                        {
+                            foundInCollected = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundInCollected)
+                    {
+                        Debug.LogWarning($"[ItemWheel] 🚨 Mapping validation failed: backpack[{backpackPos}] item '{item.DisplayName}' not in category {wheel.Category} or from slot");
                         Debug.LogWarning($"[ItemWheel] 🔄 Regenerating mapping for {wheel.Category}");
                         return false;  // 🚫 一个失败就全部重新生成
                     }
@@ -1191,6 +1345,7 @@ namespace ItemWheel
                     slotBuffer[wheelPos] = item;
                     wheel.WheelToBackpackMapping[wheelPos] = backpackPos;
                     wheel.BackpackToWheelMapping[backpackPos] = wheelPos;
+                    wheel.IsFromSlot[wheelPos] = false;  // 保存的映射只包含背包物品
                     validMappings++;
 
                     Debug.Log($"[ItemWheel] ✓ Restored mapping: wheel[{wheelPos}] <-> backpack[{backpackPos}] ({item.DisplayName})");
@@ -1209,14 +1364,15 @@ namespace ItemWheel
         /// <summary>
         /// 创建默认映射（按背包顺序）
         /// </summary>
-        private void CreateDefaultMapping(CategoryWheel wheel, List<Item> collected, Item[] slotBuffer)
+        private void CreateDefaultMapping(CategoryWheel wheel, List<CollectedItemInfo> collected, Item[] slotBuffer)
         {
             // 清空旧映射
             System.Array.Fill(wheel.WheelToBackpackMapping, -1);
             wheel.BackpackToWheelMapping.Clear();
+            System.Array.Fill(wheel.IsFromSlot, false);
 
             int bufferIndex = 0;
-            foreach (Item collectedItem in collected)
+            foreach (CollectedItemInfo itemInfo in collected)
             {
                 // 跳过索引8（中心位置）
                 if (bufferIndex == 8)
@@ -1229,19 +1385,25 @@ namespace ItemWheel
                     break;
                 }
 
-                slotBuffer[bufferIndex] = collectedItem;
+                slotBuffer[bufferIndex] = itemInfo.Item;
 
-                // 建立映射关系
-                int backpackPos = _inventory.Content.IndexOf(collectedItem);
-                if (backpackPos >= 0)
+                // 记录物品来源
+                wheel.IsFromSlot[bufferIndex] = itemInfo.IsFromSlot;
+
+                // 建立映射关系（只对背包物品建立映射，插槽物品不参与映射）
+                if (!itemInfo.IsFromSlot)
                 {
-                    wheel.WheelToBackpackMapping[bufferIndex] = backpackPos;
-                    wheel.BackpackToWheelMapping[backpackPos] = bufferIndex;
-                    Debug.Log($"[ItemWheel] Mapping: wheel[{bufferIndex}] <-> backpack[{backpackPos}] ({collectedItem.DisplayName})");
+                    int backpackPos = itemInfo.BackpackIndex;
+                    if (backpackPos >= 0)
+                    {
+                        wheel.WheelToBackpackMapping[bufferIndex] = backpackPos;
+                        wheel.BackpackToWheelMapping[backpackPos] = bufferIndex;
+                        Debug.Log($"[ItemWheel] Mapping: wheel[{bufferIndex}] <-> backpack[{backpackPos}] ({itemInfo.Item.DisplayName})");
+                    }
                 }
                 else
                 {
-                    Debug.LogWarning($"[ItemWheel] Item {collectedItem.DisplayName} not found in inventory");
+                    Debug.Log($"[ItemWheel] Slot item: wheel[{bufferIndex}] = {itemInfo.Item.DisplayName} (from slot, not draggable)");
                 }
 
                 bufferIndex++;

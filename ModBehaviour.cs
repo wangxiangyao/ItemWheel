@@ -70,11 +70,25 @@ namespace ItemWheel
 
                 try
                 {
-                    if (context.started || (context.performed && !context.canceled))
+                    // started: 开始计时（不拦截官方方法）
+                    if (context.started)
+                    {
                         _instance._wheelSystem.OnKeyPressed(ItemWheelSystem.ItemWheelCategory.Melee);
+                        return true; // 允许官方方法继续
+                    }
 
+                    // canceled: 按键松开
                     if (context.canceled)
+                    {
+                        // 检查是否触发了轮盘（长按）
+                        bool hasTriggeredWheel = _instance._wheelSystem.HasTriggeredWheel(ItemWheelSystem.ItemWheelCategory.Melee);
+
                         _instance._wheelSystem.OnKeyReleased(ItemWheelSystem.ItemWheelCategory.Melee);
+
+                        // 如果触发了轮盘（长按），拦截官方方法的 canceled 处理
+                        // 如果没触发轮盘（短按），允许官方方法处理
+                        return !hasTriggeredWheel; // 长按返回false拦截，短按返回true放行
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -82,7 +96,8 @@ namespace ItemWheel
                     return true;
                 }
 
-                return false; // 阻止原方法，避免与官方近战切换冲突
+                // 其他事件（如performed）：不拦截，让官方方法正常执行
+                return true;
             }
 
             private static bool Forward(InputAction.CallbackContext context, int shortcutIndex)

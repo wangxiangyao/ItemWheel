@@ -305,7 +305,11 @@ namespace ItemWheel
             else
             {
                 // 短按：直接使用物品
-                UseShortcutDirect(category);
+                // 近战武器：短按不处理，让官方方法生效（在ModBehaviour的Harmony Patch中处理）
+                if (category != ItemWheelCategory.Melee)
+                {
+                    UseShortcutDirect(category);
+                }
             }
 
             // 重置状态
@@ -314,16 +318,23 @@ namespace ItemWheel
         }
 
         /// <summary>
+        /// 检查指定类别是否已触发轮盘（用于Harmony Patch判断）
+        /// </summary>
+        public bool HasTriggeredWheel(ItemWheelCategory category)
+        {
+            if (_keyStates.TryGetValue(category, out var state))
+            {
+                return state.HasTriggeredWheel;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// 直接使用快捷物品（避免循环调用）
         /// </summary>
         /// <param name="category">物品类别</param>
         private void UseShortcutDirect(ItemWheelCategory category)
         {
-            // 近战（V）：禁用短按，避免与近战轮盘逻辑冲突
-            if (category == ItemWheelCategory.Melee)
-            {
-                return;
-            }
             if (!_wheels.TryGetValue(category, out var wheel))
             {
                 return;  // 轮盘还未创建，忽略

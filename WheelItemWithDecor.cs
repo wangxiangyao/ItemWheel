@@ -12,14 +12,16 @@ namespace ItemWheel
         private readonly Color? _overrideTint;
         private readonly float? _overrideDurability01;
         private readonly bool _rightAlign;
+        private readonly int? _overrideStackCount; // 🆕 手雷堆叠数量覆盖
 
-        public WheelItemWithDecor(Item item, string overrideRightText = null, Color? overrideTint = null, float? overrideDurability01 = null, bool rightAlign = true)
+        public WheelItemWithDecor(Item item, string overrideRightText = null, Color? overrideTint = null, float? overrideDurability01 = null, bool rightAlign = true, int? overrideStackCount = null)
         {
             _item = item;
             _overrideRightText = overrideRightText;
             _overrideTint = overrideTint;
             _overrideDurability01 = overrideDurability01;
             _rightAlign = rightAlign;
+            _overrideStackCount = overrideStackCount; // 🆕 初始化
         }
 
         public Sprite GetIcon() => _item?.Icon;
@@ -51,6 +53,11 @@ namespace ItemWheel
                 if (!string.IsNullOrEmpty(_overrideRightText))
                 {
                     topLine = _overrideRightText;
+                }
+                // 🆕 手雷堆叠特殊处理：优先使用覆盖的堆叠数量
+                else if (_overrideStackCount.HasValue && _overrideStackCount.Value > 1)
+                {
+                    topLine = $"x{_overrideStackCount.Value}";
                 }
                 else if (_item.Stackable && _item.StackCount > 1)
                 {
@@ -89,6 +96,13 @@ namespace ItemWheel
         {
             if (!string.IsNullOrEmpty(_overrideRightText)) return _overrideRightText;
             if (_item == null) return null;
+
+            // 🆕 手雷堆叠特殊处理：优先使用覆盖的堆叠数量
+            if (_overrideStackCount.HasValue && _overrideStackCount.Value > 1)
+            {
+                return "x" + _overrideStackCount.Value.ToString();
+            }
+
             if (_item.Stackable && _item.StackCount > 1)
             {
                 return "x" + _item.StackCount.ToString();

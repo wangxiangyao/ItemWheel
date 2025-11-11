@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using HarmonyLib;
+using Duckov.Modding;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -9,7 +11,7 @@ namespace ItemWheel
     {
         private static ModBehaviour _instance;
         private Harmony _harmony;
-        private ItemWheelSystem _wheelSystem;
+        // private ItemWheelSystem _wheelSystem; // 🚫 步骤1隔离：暂不初始化
 
         private void Awake()
         {
@@ -22,15 +24,93 @@ namespace ItemWheel
             _instance = this;
             DontDestroyOnLoad(gameObject);
 
-            _wheelSystem = new ItemWheelSystem();
-
             _harmony = new Harmony("com.duckov.itemwheel");
             _harmony.PatchAll(typeof(ModBehaviour).Assembly);
         }
 
+        /// <summary>
+        /// 游戏和ModManager初始化完成后调用（主要注册路径）
+        /// </summary>
+        protected override void OnAfterSetup()
+        {
+            string assemblyPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            string modDir = System.IO.Path.GetDirectoryName(assemblyPath);
+            string modSettingPath = System.IO.Path.Combine(modDir, "Integration", "ModSettingAPI.cs");
+
+            if (System.IO.File.Exists(modSettingPath))
+            {
+                if (ModSettingAPI.Init(this.info))
+                {
+                    RegisterModSettingUI();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 注册ModSetting配置UI（参考EliteEnemies的实现）
+        /// </summary>
+        private void RegisterModSettingUI()
+        {
+            try
+            {
+                // 搜索设置
+                ModSettingAPI.AddToggle("ItemWheel_SearchInSlots",
+                    "搜索容器内的物品", true,
+                    value => { /* Settings callback */ });
+
+                ModSettingAPI.AddToggle("ItemWheel_SearchInPetInventory",
+                    "搜索宠物背包", true,
+                    value => { /* Settings callback */ });
+
+                // 轮盘类别
+                ModSettingAPI.AddToggle("ItemWheel_EnableMedical",
+                    "医疗品轮盘 (3)", true,
+                    value => { /* Settings callback */ });
+
+                ModSettingAPI.AddToggle("ItemWheel_EnableStim",
+                    "刺激物轮盘 (4)", true,
+                    value => { /* Settings callback */ });
+
+                ModSettingAPI.AddToggle("ItemWheel_EnableFood",
+                    "食物轮盘 (5)", true,
+                    value => { /* Settings callback */ });
+
+                ModSettingAPI.AddToggle("ItemWheel_EnableExplosive",
+                    "手雷轮盘 (6)", true,
+                    value => { /* Settings callback */ });
+
+                ModSettingAPI.AddToggle("ItemWheel_EnableMelee",
+                    "近战武器轮盘 (V)", true,
+                    value => { /* Settings callback */ });
+
+                ModSettingAPI.AddToggle("ItemWheel_EnableAmmo",
+                    "子弹轮盘 (长按R)", true,
+                    value => { /* Settings callback */ });
+
+                // 特殊功能
+                ModSettingAPI.AddToggle("ItemWheel_EnableBulletTime",
+                    "子弹时间 (开发中)", false,
+                    value => { /* Settings callback */ });
+
+                // UI设置
+                ModSettingAPI.AddToggle("ItemWheel_ShowItemCount",
+                    "显示物品数量", true,
+                    value => { /* Settings callback */ });
+
+                ModSettingAPI.AddToggle("ItemWheel_ShowDurabilityBar",
+                    "显示耐久条", true,
+                    value => { /* Settings callback */ });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ItemWheel] 注册配置UI失败: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
         private void Update()
         {
-            _wheelSystem?.Update();
+            // 🚫 步骤1隔离：暂不更新ItemWheelSystem
+            // _wheelSystem?.Update();
         }
 
         private void OnDestroy()
@@ -38,11 +118,14 @@ namespace ItemWheel
             if (_instance == this)
             {
                 _harmony?.UnpatchAll(_harmony.Id);
-                _wheelSystem?.Dispose();
+                // 🚫 步骤1隔离：暂不处理ItemWheelSystem
+                // _wheelSystem?.Dispose();
                 _instance = null;
             }
         }
 
+        // 🚫 步骤1隔离：暂不注册Harmony补丁
+        /*
         [HarmonyPatch(typeof(CharacterInputControl))]
         private static class CharacterInputPatch
         {
@@ -169,6 +252,7 @@ namespace ItemWheel
             3 => ItemWheelSystem.ItemWheelCategory.Explosive,
             _ => ItemWheelSystem.ItemWheelCategory.Medical
         };
+        */
     }
 }
 

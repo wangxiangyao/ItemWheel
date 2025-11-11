@@ -47,6 +47,18 @@ namespace ItemWheel
         }
 
         /// <summary>
+        /// 尝试获取已保存的值，如果不存在则返回默认值
+        /// </summary>
+        private bool GetSavedBoolValue(string key, bool defaultValue)
+        {
+            if (ModSettingAPI.GetSavedValue<bool>(key, out bool savedValue))
+            {
+                return savedValue;
+            }
+            return defaultValue;
+        }
+
+        /// <summary>
         /// 注册ModSetting配置UI（参考EliteEnemies的实现）
         /// </summary>
         private void RegisterModSettingUI()
@@ -55,50 +67,61 @@ namespace ItemWheel
             {
                 // 搜索设置
                 ModSettingAPI.AddToggle("ItemWheel_SearchInSlots",
-                    "搜索容器内的物品", true,
+                    "搜索容器内的物品",
+                    GetSavedBoolValue("ItemWheel_SearchInSlots", true),
                     value => { /* Settings callback */ });
 
                 ModSettingAPI.AddToggle("ItemWheel_SearchInPetInventory",
-                    "搜索宠物背包", true,
+                    "搜索宠物背包",
+                    GetSavedBoolValue("ItemWheel_SearchInPetInventory", true),
                     value => { /* Settings callback */ });
 
                 // 轮盘类别
                 ModSettingAPI.AddToggle("ItemWheel_EnableMedical",
-                    "医疗品轮盘 (3)", true,
+                    "医疗品轮盘 (3)",
+                    GetSavedBoolValue("ItemWheel_EnableMedical", true),
                     value => { /* Settings callback */ });
 
                 ModSettingAPI.AddToggle("ItemWheel_EnableStim",
-                    "刺激物轮盘 (4)", true,
+                    "刺激物轮盘 (4)",
+                    GetSavedBoolValue("ItemWheel_EnableStim", true),
                     value => { /* Settings callback */ });
 
                 ModSettingAPI.AddToggle("ItemWheel_EnableFood",
-                    "食物轮盘 (5)", true,
+                    "食物轮盘 (5)",
+                    GetSavedBoolValue("ItemWheel_EnableFood", true),
                     value => { /* Settings callback */ });
 
                 ModSettingAPI.AddToggle("ItemWheel_EnableExplosive",
-                    "手雷轮盘 (6)", true,
+                    "手雷轮盘 (6)",
+                    GetSavedBoolValue("ItemWheel_EnableExplosive", true),
                     value => { /* Settings callback */ });
 
                 ModSettingAPI.AddToggle("ItemWheel_EnableMelee",
-                    "近战武器轮盘 (V)", true,
+                    "近战武器轮盘 (V)",
+                    GetSavedBoolValue("ItemWheel_EnableMelee", true),
                     value => { /* Settings callback */ });
 
                 ModSettingAPI.AddToggle("ItemWheel_EnableAmmo",
-                    "子弹轮盘 (长按R)", true,
+                    "子弹轮盘 (长按R)",
+                    GetSavedBoolValue("ItemWheel_EnableAmmo", true),
                     value => { /* Settings callback */ });
 
                 // 特殊功能
                 ModSettingAPI.AddToggle("ItemWheel_EnableBulletTime",
-                    "子弹时间 (开发中)", false,
+                    "子弹时间 (开发中)",
+                    GetSavedBoolValue("ItemWheel_EnableBulletTime", false),
                     value => { /* Settings callback */ });
 
                 // UI设置
                 ModSettingAPI.AddToggle("ItemWheel_ShowItemCount",
-                    "显示物品数量", true,
+                    "显示物品数量",
+                    GetSavedBoolValue("ItemWheel_ShowItemCount", true),
                     value => { /* Settings callback */ });
 
                 ModSettingAPI.AddToggle("ItemWheel_ShowDurabilityBar",
-                    "显示耐久条", true,
+                    "显示耐久条",
+                    GetSavedBoolValue("ItemWheel_ShowDurabilityBar", true),
                     value => { /* Settings callback */ });
             }
             catch (Exception ex)

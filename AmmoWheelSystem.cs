@@ -7,6 +7,8 @@ using QuickWheel.Selection;
 using QuickWheel.UI;
 using UnityEngine;
 using QuickWheel.Utils;
+using ItemWheel.UI;
+using ItemWheel.Integration;
 
 namespace ItemWheel
 {
@@ -17,10 +19,6 @@ namespace ItemWheel
     /// </summary>
     public sealed class AmmoWheelSystem
     {
-        // 自定义格子Sprite（与物品轮盘一致）
-        private static Sprite _slotNormalSprite;
-        private static Sprite _slotHoverSprite;
-        private static Sprite _slotSelectedSprite;
 
         private class KeyState
         {
@@ -57,6 +55,7 @@ namespace ItemWheel
 
         public void OnKeyPressed()
         {
+            Debug.Log("[AmmoWheel] R键按下");
             _state.IsPressed = true;
             _state.HoldTime = 0f;
             _state.HasTriggeredWheel = false;
@@ -91,6 +90,7 @@ namespace ItemWheel
                 const float threshold = 0.2f;
                 if (_state.HoldTime >= threshold)
                 {
+                    Debug.Log($"[AmmoWheel] 检测到长按 (HoldTime={_state.HoldTime:F2}s)");
                     _state.HasTriggeredWheel = true;
                     ShowWheel(_state.PressedMousePosition);
                 }
@@ -104,7 +104,8 @@ namespace ItemWheel
                 return;
             }
 
-            LoadCustomSprites();
+            // 🆕 使用统一的 WheelSpriteLoader
+            WheelSpriteLoader.Load();
 
             _input = new QuickWheel.Input.MouseWheelInput();
             _view = new DefaultWheelView<Item>();
@@ -116,9 +117,10 @@ namespace ItemWheel
                     cfg.GridCellSize = 90f;
                     cfg.GridSpacing = 12f;
                     cfg.DeadZoneRadius = 40f; // 死区半径（像素）
-                    cfg.SlotNormalSprite = _slotNormalSprite;
-                    cfg.SlotHoverSprite = _slotHoverSprite;
-                    cfg.SlotSelectedSprite = _slotSelectedSprite;
+                    // 🆕 使用 WheelSpriteLoader 加载的自定义格子Sprite
+                    cfg.SlotNormalSprite = WheelSpriteLoader.SlotNormal;
+                    cfg.SlotHoverSprite = WheelSpriteLoader.SlotHover;
+                    cfg.SlotSelectedSprite = WheelSpriteLoader.SlotSelected;
                 })
                 .WithAdapter(new BulletWheelAdapter(_bulletTypeCounts))
                 .WithView(_view)
@@ -134,13 +136,24 @@ namespace ItemWheel
 
         private void ShowWheel(Vector2 center)
         {
-            _isClosing = false;
-            _skipOnHidden = false;
-            if (!RefreshSlots())
+            // 🆕 检查 ModSetting 配置
+            if (!ModSettingFacade.Settings.EnableAmmoWheel)
             {
+                Debug.Log("[AmmoWheel] 子弹轮盘已在配置中禁用");
                 return;
             }
 
+            _isClosing = false;
+            _skipOnHidden = false;
+
+            Debug.Log("[AmmoWheel] 开始刷新子弹槽位...");
+            if (!RefreshSlots())
+            {
+                Debug.Log("[AmmoWheel] 没有可用子弹或未装备枪械，不显示轮盘");
+                return;
+            }
+
+            Debug.Log($"[AmmoWheel] 子弹槽位刷新完成，显示轮盘");
             _view?.SetWheelCenterBeforeShow(center);
             _input?.SetPressedState(true);
             _wheel?.Show();
@@ -323,26 +336,6 @@ namespace ItemWheel
             try { ch?.TryToReload(prefered); } catch { }
         }
 
-        private static void LoadCustomSprites()
-        {
-            if (_slotNormalSprite != null) return;
-            try
-            {
-                string modPath = System.IO.Path.GetDirectoryName(
-                    System.Reflection.Assembly.GetExecutingAssembly().Location
-                );
-                string texturePath = System.IO.Path.Combine(modPath, "texture");
-                string normalPath = System.IO.Path.Combine(texturePath, "WheelSlot_Normal.png");
-                string hoverPath = System.IO.Path.Combine(texturePath, "WheelSlot_Hover.png");
-                string selectedPath = System.IO.Path.Combine(texturePath, "WheelSlot_Selected.png");
-                _slotNormalSprite = SpriteLoader.LoadFromFile(normalPath, 100f);
-                _slotHoverSprite = SpriteLoader.LoadFromFile(hoverPath, 100f);
-                _slotSelectedSprite = SpriteLoader.LoadFromFile(selectedPath, 100f);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[AmmoWheel] 加载格子贴图失败: {e.Message}");
-            }
-        }
+        // 🗑️ LoadCustomSprites 方法已移除，使用统一的 ItemWheel.UI.SpriteLoader 替代
     }
 }

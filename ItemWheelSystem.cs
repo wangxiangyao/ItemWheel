@@ -8,6 +8,10 @@ using QuickWheel.UI;
 using QuickWheel.Utils;
 using QuickWheel.Selection;
 using UnityEngine;
+using ItemWheel.UI;
+using ItemWheel.Data;
+using ItemWheel.Core;
+using ItemWheel.Integration;
 
 namespace ItemWheel
 {
@@ -38,39 +42,7 @@ namespace ItemWheel
                 { "MeleeWeapon", ItemWheelCategory.Melee }
             };
 
-        internal sealed class CategoryWheel
-        {
-            public ItemWheelCategory Category;
-            public Wheel<Item> Wheel;
-            public Item[] Slots;
-            public int LastConfirmedIndex;
-            public QuickWheel.Input.MouseWheelInput Input;  // ✅ 保存输入处理器引用
-            public DefaultWheelView<Item> View;  // ⭐ 保存View引用用于设置中心位置
-
-            // 🆕 双向映射机制：轮盘位置 ↔ 背包位置
-            public int[] WheelToBackpackMapping;              // 轮盘位置[0-7] → 背包位置
-            public Dictionary<int, int> BackpackToWheelMapping; // 背包位置 → 轮盘位置
-
-            // 🆕 物品来源标记：记录每个轮盘位置的物品来源（背包 vs 插槽）
-            public bool[] IsFromSlot;  // true = 来自插槽, false = 来自背包
-
-            // 🆕 手雷堆叠信息映射：背包索引 → CollectedItemInfo（用于手雷的堆叠管理）
-            public Dictionary<int, CollectedItemInfo> ItemInfoMap; // 🆕 键改为 BackpackIndex
-
-            // 🆕 是否首次加载（用于从官方快捷栏同步选中）
-            public bool IsFirstLoad;  // 🆕 新增字段
-
-            public CategoryWheel()
-            {
-                // 初始化映射数据结构（8个轮盘位置）
-                WheelToBackpackMapping = new int[8];
-                System.Array.Fill(WheelToBackpackMapping, -1); // -1 表示空位
-                BackpackToWheelMapping = new Dictionary<int, int>();
-                IsFromSlot = new bool[8];  // 默认全为false（来自背包）
-                ItemInfoMap = new Dictionary<int, CollectedItemInfo>(); // 🆕 初始化为 int 键
-                IsFirstLoad = true;  // 🆕 标记为首次加载
-            }
-        }
+        // CategoryWheel 已移到 ItemWheel.Data.CategoryWheel
 
         [System.NonSerialized]
         private Dictionary<ItemWheelCategory, CategoryWheel> _wheels;
@@ -80,11 +52,6 @@ namespace ItemWheel
 
         [System.NonSerialized]
         private Inventory _inventory;
-
-        // 自定义格子Sprite
-        private static Sprite _slotNormalSprite;
-        private static Sprite _slotHoverSprite;
-        private static Sprite _slotSelectedSprite;
 
         // 🆕 防止递归事件标志：轮盘拖拽时同步背包，避免触发背包变化事件再次更新轮盘
         private bool _isPerformingSwap = false;
@@ -97,50 +64,11 @@ namespace ItemWheel
             _wheels = new Dictionary<ItemWheelCategory, CategoryWheel>();
             LevelManager.OnLevelInitialized += HandleLevelInitialized;
 
-            // 加载自定义格子Sprite
-            LoadCustomSprites();
+            // 🆕 使用统一的 WheelSpriteLoader 加载自定义格子Sprite
+            WheelSpriteLoader.Load();
 
             // 初始化持久化系统
             InitializePersistence();
-        }
-
-        /// <summary>
-        /// 从Mod目录加载自定义格子Sprite
-        /// </summary>
-        private static void LoadCustomSprites()
-        {
-            if (_slotNormalSprite != null) return;  // 已经加载过了
-
-            try
-            {
-                // 获取Mod目录路径
-                string modPath = System.IO.Path.GetDirectoryName(
-                    System.Reflection.Assembly.GetExecutingAssembly().Location
-                );
-                string texturePath = System.IO.Path.Combine(modPath, "texture");
-
-                // 加载三个状态的Sprite
-                string normalPath = System.IO.Path.Combine(texturePath, "WheelSlot_Normal.png");
-                string hoverPath = System.IO.Path.Combine(texturePath, "WheelSlot_Hover.png");
-                string selectedPath = System.IO.Path.Combine(texturePath, "WheelSlot_Selected.png");
-
-                _slotNormalSprite = SpriteLoader.LoadFromFile(normalPath, 100f);
-                _slotHoverSprite = SpriteLoader.LoadFromFile(hoverPath, 100f);
-                _slotSelectedSprite = SpriteLoader.LoadFromFile(selectedPath, 100f);
-
-                if (_slotNormalSprite != null)
-                {
-                    Debug.Log("[ItemWheel] Custom slot sprites loaded successfully");
-                }
-                else
-                {
-                    Debug.LogWarning("[ItemWheel] Failed to load custom slot sprites, will use default colors");
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[ItemWheel] Error loading custom sprites: {e}");
-            }
         }
 
         /// <summary>
@@ -505,6 +433,44 @@ namespace ItemWheel
             {
                 // 🆕 订阅背包内容变化事件
                 _inventory.onContentChanged += OnInventoryContentChanged;
+
+                // 🆕 阶段3：游戏启动后初始化所有轮盘，触发首次加载逻辑
+                InitializeAllWheelsOnStart();
+            }
+        }
+
+        /// <summary>
+        /// 🆕 游戏启动时初始化所有轮盘，触发首次加载逻辑
+        /// </summary>
+        private void InitializeAllWheelsOnStart()
+        {
+            Debug.Log("[ItemWheel] 🎮 游戏启动，初始化所有轮盘...");
+
+            // 遍历所有类别（不包括近战）
+            var categories = new[]
+            {
+                ItemWheelCategory.Medical,
+                ItemWheelCategory.Stim,
+                ItemWheelCategory.Food,
+                ItemWheelCategory.Explosive
+            };
+
+            foreach (var category in categories)
+            {
+                // 检查配置是否启用该轮盘
+                if (!ModSettingFacade.Settings.IsWheelEnabled(category))
+                {
+                    Debug.Log($"[ItemWheel] 跳过禁用的轮盘: {category}");
+                    continue;
+                }
+
+                // 确保轮盘存在
+                var wheel = EnsureWheel(category);
+
+                // 刷新轮盘，触发 IsFirstLoad 逻辑
+                RefreshCategorySlots(wheel, resetSelection: false);
+
+                Debug.Log($"[ItemWheel] ✅ 初始化轮盘: {category}, 选中索引={wheel.LastConfirmedIndex}");
             }
         }
 
@@ -657,10 +623,16 @@ namespace ItemWheel
                     cfg.GridSpacing = 12f;   // 格子间距（像素）
                     cfg.DeadZoneRadius = 40f; // 死区半径（像素）
 
-                    // 使用自定义格子Sprite
-                    cfg.SlotNormalSprite = _slotNormalSprite;
-                    cfg.SlotHoverSprite = _slotHoverSprite;
-                    cfg.SlotSelectedSprite = _slotSelectedSprite;
+                    // 🆕 使用 WheelSpriteLoader 加载的自定义格子Sprite
+                    cfg.SlotNormalSprite = WheelSpriteLoader.SlotNormal;
+                    cfg.SlotHoverSprite = WheelSpriteLoader.SlotHover;
+                    cfg.SlotSelectedSprite = WheelSpriteLoader.SlotSelected;
+
+                    // 🆕 阶段3：拖拽验证回调 - 只允许主背包顶层单物品拖拽
+                    cfg.CanDragSlot = (slotIndex) =>
+                    {
+                        return CanDragSlotImpl(context, slotIndex);
+                    };
                 })
                 .WithAdapter(adapter)
                 .WithView(view)  // ⭐ 使用创建的View实例
@@ -722,6 +694,27 @@ namespace ItemWheel
             // 🗑️ 移除历史记录功能：轮盘布局完全由背包物品位置决定，无需持久化
             CreateDefaultMapping(wheel, collected, slotBuffer);
 
+            // 🆕 阶段3：填充 DisplayedItems，用于准确判断物品来源
+            // 建立 slotBuffer 到 collected 的映射
+            wheel.DisplayedItems.Clear();
+            for (int i = 0; i < slotBuffer.Length; i++)
+            {
+                if (slotBuffer[i] != null)
+                {
+                    // 在 collected 中查找对应的 CollectedItemInfo
+                    var matchInfo = collected.Find(info => info.Item == slotBuffer[i]);
+                    if (matchInfo.Item != null)
+                    {
+                        wheel.DisplayedItems.Add(matchInfo);
+                    }
+                }
+                else
+                {
+                    // 空槽位，添加空占位符（保持索引对应）
+                    wheel.DisplayedItems.Add(default(CollectedItemInfo));
+                }
+            }
+
             // 🆕 关键点：必须在 SetSlots 之前填充 ItemInfoMap！
             // 因为 SetSlots 会触发 WheelUIManager 创建显示，立即调用适配器
             // 使用 BackpackIndex 作为键（唯一），避免 Item 引用不匹配问题
@@ -745,24 +738,17 @@ namespace ItemWheel
             // 根据 resetSelection 参数决定是否重置选择
             if (resetSelection)
             {
-                // 背包变化时：选择第一个可用的背包物品（跳过插槽物品）
-                wheel.LastConfirmedIndex = GetFirstAvailableBackpackItemIndex(wheel);
+                // 背包变化时：选择第一个可用物品（支持容器和宠物物品）
+                wheel.LastConfirmedIndex = GetFirstAvailableItemIndex(wheel);
             }
             else
             {
-                // 只是打开轮盘时：如果之前的选择还存在就保持，否则选第一个背包物品
+                // 只是打开轮盘时：如果之前的选择还存在就保持，否则选第一个可用物品
                 if (wheel.LastConfirmedIndex < 0 || wheel.LastConfirmedIndex >= slotBuffer.Length || slotBuffer[wheel.LastConfirmedIndex] == null)
                 {
-                    wheel.LastConfirmedIndex = GetFirstAvailableBackpackItemIndex(wheel);
+                    wheel.LastConfirmedIndex = GetFirstAvailableItemIndex(wheel);
                 }
-                else
-                {
-                    // 🆕 如果之前选中的是插槽物品，重新选择第一个背包物品
-                    if (wheel.IsFromSlot != null && wheel.IsFromSlot[wheel.LastConfirmedIndex])
-                    {
-                        wheel.LastConfirmedIndex = GetFirstAvailableBackpackItemIndex(wheel);
-                    }
-                }
+                // 🆕 阶段3：不再重置插槽物品的选中，支持容器和宠物物品保持选中
 
                 // 🆕 首次加载：从官方快捷栏同步选中
                 if (wheel.IsFirstLoad && wheel.Category != ItemWheelCategory.Melee)
@@ -771,6 +757,8 @@ namespace ItemWheel
 
                     var shortcutIndex = (int)wheel.Category;
                     Item officialSelectedItem = Duckov.ItemShortcut.Get(shortcutIndex);
+
+                    bool syncSuccess = false;
 
                     if (officialSelectedItem != null)
                     {
@@ -781,7 +769,26 @@ namespace ItemWheel
                         if (officialIndex >= 0)
                         {
                             wheel.LastConfirmedIndex = officialIndex;
+                            syncSuccess = true;
                             Debug.Log($"[ItemWheel] ✅ 同步成功: 位置={officialIndex}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[ItemWheel] ⚠️ 官方快捷栏物品不在当前轮盘中: {officialSelectedItem.DisplayName}");
+                        }
+                    }
+                    else
+                    {
+                        Debug.Log($"[ItemWheel] 官方快捷栏为空，类别={wheel.Category}");
+                    }
+
+                    // 🆕 阶段3：后备方案 - 如果同步失败，默认选择第一个可用物品
+                    if (!syncSuccess && wheel.LastConfirmedIndex < 0)
+                    {
+                        wheel.LastConfirmedIndex = GetFirstAvailableItemIndex(wheel);
+                        if (wheel.LastConfirmedIndex >= 0)
+                        {
+                            Debug.Log($"[ItemWheel] 使用后备方案，选中第一个可用物品: 位置={wheel.LastConfirmedIndex}");
                         }
                     }
                 }
@@ -790,22 +797,23 @@ namespace ItemWheel
             // 更新快捷栏UI（近战不更新官方快捷栏，避免错位）
             if (wheel.LastConfirmedIndex >= 0 && wheel.Category != ItemWheelCategory.Melee)
             {
-                // 🆕 再次检查：只对背包物品更新快捷栏
-                bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[wheel.LastConfirmedIndex];
-                if (!isFromSlot)
-                {
-                    var shortcutIndex = (int)wheel.Category;
-                    Duckov.ItemShortcut.Set(shortcutIndex, slotBuffer[wheel.LastConfirmedIndex]);
-                }
+                // 🆕 阶段3：支持容器和宠物物品选中到快捷栏
+                var shortcutIndex = (int)wheel.Category;
+                var selectedItem = slotBuffer[wheel.LastConfirmedIndex];
+                Duckov.ItemShortcut.Set(shortcutIndex, selectedItem);
+
+                // 🆕 阶段3：准确判断物品来源
+                string source = GetItemSourceDescription(selectedItem, wheel, wheel.LastConfirmedIndex);
+                Debug.Log($"[ItemWheel] 设置快捷栏: 类别={wheel.Category}, 物品={selectedItem?.DisplayName}, 来源={source}");
             }
 
             return true;
         }
 
         /// <summary>
-        /// 获取第一个可用的背包物品索引（跳过插槽物品和空位）
+        /// 🆕 阶段3：获取第一个可用的物品索引（支持容器和宠物物品）
         /// </summary>
-        private static int GetFirstAvailableBackpackItemIndex(CategoryWheel wheel)
+        private static int GetFirstAvailableItemIndex(CategoryWheel wheel)
         {
             if (wheel == null || wheel.Slots == null)
             {
@@ -821,16 +829,38 @@ namespace ItemWheel
 
                 if (wheel.Slots[i] != null)
                 {
-                    // 🆕 跳过插槽物品，只选择背包物品
-                    bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[i];
-                    if (!isFromSlot)
-                    {
-                        return i;
-                    }
+                    // 阶段3：支持所有来源的物品（背包、容器、宠物）
+                    return i;
                 }
             }
 
             return -1;
+        }
+
+        /// <summary>
+        /// 获取物品来源描述（使用 DisplayedItems 精确判断）
+        /// </summary>
+        private static string GetItemSourceDescription(Item item, CategoryWheel wheel, int wheelIndex)
+        {
+            if (item == null)
+                return "未知";
+
+            // 直接从 DisplayedItems 获取完整信息
+            if (wheel.DisplayedItems != null && wheelIndex >= 0 && wheelIndex < wheel.DisplayedItems.Count)
+            {
+                var itemInfo = wheel.DisplayedItems[wheelIndex];
+                if (itemInfo.Item == item)
+                {
+                    // 使用 CollectedItemInfo 的便捷属性判断来源
+                    if (itemInfo.IsFromSlot)
+                        return itemInfo.IsFromPet ? "宠物背包容器" : "主背包容器";
+                    else
+                        return itemInfo.IsFromPet ? "宠物背包" : "主背包";
+                }
+            }
+
+            // 回退：无法确定来源
+            return "未知";
         }
 
         /// <summary>
@@ -866,46 +896,42 @@ namespace ItemWheel
                 wheel.LastConfirmedIndex < wheel.Slots.Length &&
                 wheel.Slots[wheel.LastConfirmedIndex] != null)
             {
-                // 🆕 检查选中的物品是否来自插槽，如果是则选择第一个背包物品
-                bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[wheel.LastConfirmedIndex];
-                if (!isFromSlot)
+                // 🆕 阶段3：支持容器和宠物物品，不再跳过
+                // 手雷特殊处理：需要从 AllLocations 中验证是否还有可用物品
+                if (wheel.Category == ItemWheelCategory.Explosive)
                 {
-                    // 🆕 手雷特殊处理：需要从 AllBackpackIndices 中找到第一个可用的物品
-                    if (wheel.Category == ItemWheelCategory.Explosive)
+                    Item selectedItem = wheel.Slots[wheel.LastConfirmedIndex];
+                    if (selectedItem != null && wheel.ItemInfoMap != null)
                     {
-                        Item selectedItem = wheel.Slots[wheel.LastConfirmedIndex];
-                        if (selectedItem != null && wheel.ItemInfoMap != null)
+                        // 使用 TypeID 查找匹配的堆叠
+                        bool foundInfo = false;
+                        CollectedItemInfo itemInfo = default(CollectedItemInfo);
+                        string selectedTypeId = selectedItem.TypeID.ToString();
+
+                        foreach (var kvp in wheel.ItemInfoMap)
                         {
-                            // 🆕 使用 TypeID 查找匹配的堆叠
-                            bool foundInfo = false;
-                            CollectedItemInfo itemInfo = default(CollectedItemInfo);
-                            string selectedTypeId = selectedItem.TypeID.ToString();
-
-                            foreach (var kvp in wheel.ItemInfoMap)
+                            if (kvp.Value.Item != null && kvp.Value.Item.TypeID.ToString() == selectedTypeId)
                             {
-                                if (kvp.Value.Item != null && kvp.Value.Item.TypeID.ToString() == selectedTypeId)
-                                {
-                                    itemInfo = kvp.Value;
-                                    foundInfo = true;
-                                    break;
-                                }
-                            }
-
-                            if (foundInfo && itemInfo.AllBackpackIndices != null && itemInfo.AllBackpackIndices.Count > 0)
-                            {
-                                // 返回第一个可用物品的背包位置映射到轮盘索引
-                                // 对于手雷堆叠，轮盘上只有一个格子代表所有同类手雷
-                                return wheel.LastConfirmedIndex;
+                                itemInfo = kvp.Value;
+                                foundInfo = true;
+                                break;
                             }
                         }
-                    }
 
-                    return wheel.LastConfirmedIndex;
+                        if (foundInfo && itemInfo.AllLocations != null && itemInfo.AllLocations.Count > 0)
+                        {
+                            // 返回第一个可用物品的背包位置映射到轮盘索引
+                            // 对于手雷堆叠，轮盘上只有一个格子代表所有同类手雷
+                            return wheel.LastConfirmedIndex;
+                        }
+                    }
                 }
+
+                return wheel.LastConfirmedIndex;
             }
 
-            // 选择第一个可用的背包物品（跳过插槽物品）
-            return GetFirstAvailableBackpackItemIndex(wheel);
+            // 选择第一个可用物品（支持容器和宠物物品）
+            return GetFirstAvailableItemIndex(wheel);
         }
 
         // 删除UpdateHover方法，QuickWheel自己管理hover状态
@@ -940,17 +966,7 @@ namespace ItemWheel
 
             if (selectedIndex >= 0 && selectedIndex < wheel.Slots.Length && wheel.Slots[selectedIndex] != null)
             {
-                // 检查是否来自插槽
-                bool isFromSlot = wheel.IsFromSlot != null && wheel.IsFromSlot[selectedIndex];
-
-                // 🆕 插槽物品不支持点击选中，只支持 hover 使用（与官方快捷栏保持一致）
-                if (isFromSlot)
-                {
-                    Debug.Log($"[轮盘] {wheel.Category} 插槽物品不可选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName} (只能hover使用)");
-                    return;
-                }
-
-                // 更新选中索引（只对背包物品）
+                // 更新选中索引（支持所有来源的物品）
                 wheel.LastConfirmedIndex = selectedIndex;
 
                 // 同步官方快捷栏（近战不更新官方快捷栏）
@@ -960,7 +976,9 @@ namespace ItemWheel
                     Duckov.ItemShortcut.Set(shortcutIndex, wheel.Slots[selectedIndex]);
                 }
 
-                Debug.Log($"[轮盘] {wheel.Category} 点击选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName}");
+                // 准确判断物品来源并记录日志
+                string source = GetItemSourceDescription(wheel.Slots[selectedIndex], wheel, selectedIndex);
+                Debug.Log($"[轮盘] {wheel.Category} 点击选中: 位置{selectedIndex} {wheel.Slots[selectedIndex].DisplayName} (来源={source})");
 
                 // 近战：hover/选中即刻装备
                 if (wheel.Category == ItemWheelCategory.Melee)
@@ -1068,230 +1086,43 @@ namespace ItemWheel
             }
         }
 
-        /// <summary>
-        /// 收集到的物品及其来源信息
-        /// </summary>
-        internal struct CollectedItemInfo
-        {
-            public Item Item;
-            public bool IsFromSlot;  // true = 来自插槽, false = 来自背包
-            public int BackpackIndex; // 如果来自背包，记录背包位置；如果来自插槽，记录父物品的背包位置
-            public int StackCount; // 🆕 堆叠数量（主要用于手雷）
-            public List<int> AllBackpackIndices; // 🆕 该堆叠中所有物品的背包位置（用于手雷选择逻辑）
-
-            public CollectedItemInfo(Item item, bool isFromSlot, int backpackIndex)
-            {
-                Item = item;
-                IsFromSlot = isFromSlot;
-                BackpackIndex = backpackIndex;
-                StackCount = 1;
-                AllBackpackIndices = new List<int> { backpackIndex };
-            }
-
-            // 🆕 用于手雷堆叠的构造函数
-            public CollectedItemInfo(Item item, bool isFromSlot, int backpackIndex, int stackCount, List<int> allIndices)
-            {
-                Item = item;
-                IsFromSlot = isFromSlot;
-                BackpackIndex = backpackIndex;
-                StackCount = stackCount;
-                AllBackpackIndices = allIndices;
-            }
-        }
+        // CollectedItemInfo 已移到 ItemWheel.Data.CollectedItemInfo
 
         /// <summary>
-        /// 从物品栏收集指定类别的所有物品（包括插槽中的物品）
-        /// 按照物品栏顺序收集，最多收集8个物品（中心空位）
-        /// 🆕 手雷类别支持堆叠：按TypeID分组，每组只显示第一个（作为代表）
+        /// 从物品栏收集指定类别的所有物品
+        /// 🆕 使用 ItemCollector 统一处理，支持多背包、容器、堆叠等
         /// </summary>
         /// <param name="category">要收集的物品类别</param>
-        /// <returns>物品及来源信息列表</returns>
+        /// <returns>收集到的所有物品列表（无数量限制）</returns>
         private List<CollectedItemInfo> CollectItemsForCategory(ItemWheelCategory category)
         {
-            var result = new List<CollectedItemInfo>(WheelConfig.SLOT_COUNT - 1);
-            var addedItems = new HashSet<Item>();  // 防止重复添加同一物品
-
             if (_inventory?.Content == null)
             {
-                return result;
+                return new List<CollectedItemInfo>();
             }
 
-            // 🆕 手雷特殊处理：按TypeID分组堆叠
-            if (category == ItemWheelCategory.Explosive)
-            {
-                // 收集所有手雷，按TypeID分组
-                Dictionary<string, List<Item>> grenadeGroups = new Dictionary<string, List<Item>>();
-                Dictionary<string, List<int>> backpackIndexMap = new Dictionary<string, List<int>>();
+            // 🆕 判断是否需要堆叠
+            bool enableStacking = ItemCollector.ShouldStack(category);
 
-                // 遍历背包收集手雷
-                for (int backpackIndex = 0; backpackIndex < _inventory.Content.Count; backpackIndex++)
-                {
-                    Item item = _inventory.Content[backpackIndex];
-                    if (item == null) continue;
-
-                    // 检查物品本身是否是手雷
-                    if (MatchesCategory(item, category) && !addedItems.Contains(item))
-                    {
-                        string typeId = item.TypeID.ToString(); // 使用TypeID作为分组键
-                        if (!grenadeGroups.ContainsKey(typeId))
-                        {
-                            grenadeGroups[typeId] = new List<Item>();
-                            backpackIndexMap[typeId] = new List<int>();
-                        }
-                        grenadeGroups[typeId].Add(item);
-                        backpackIndexMap[typeId].Add(backpackIndex);
-                        addedItems.Add(item);
-                    }
-
-                    // 检查物品的插槽中是否有手雷（插槽中的不堆叠，单独显示）
-                    if (item.Slots != null && item.Slots.Count > 0)
-                    {
-                        try
-                        {
-                            foreach (var slot in item.Slots)
-                            {
-                                if (slot?.Content == null) continue;
-
-                                Item slotItem = slot.Content;
-                                if (MatchesCategory(slotItem, category) && !addedItems.Contains(slotItem))
-                                {
-                                    // 插槽中的手雷不堆叠，单独添加
-                                    result.Add(new CollectedItemInfo(slotItem, true, backpackIndex));
-                                    addedItems.Add(slotItem);
-
-                                    if (result.Count >= WheelConfig.SLOT_COUNT - 1)
-                                    {
-                                        return result;
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.LogWarning($"[ItemWheel] 搜索物品插槽失败: {item.DisplayName}, {ex.Message}");
-                        }
-                    }
-                }
-
-                // 按TypeID分组创建堆叠项，按背包位置排序
-                foreach (var kvp in grenadeGroups)
-                {
-                    string typeId = kvp.Key;
-                    var items = kvp.Value;
-                    var indices = backpackIndexMap[typeId];
-
-                    // 按背包位置排序（保持原有顺序）
-                    var sortedPairs = items
-                        .Zip(indices, (item, index) => new { Item = item, Index = index })
-                        .OrderBy(x => x.Index)
-                        .ToList();
-
-                    // 创建堆叠：第一个物品为代表，包含所有背包位置
-                    List<int> allIndices = sortedPairs.Select(x => x.Index).ToList();
-                    Item firstItem = sortedPairs.First().Item;
-                    int firstIndex = sortedPairs.First().Index;
-
-                    result.Add(new CollectedItemInfo(
-                        firstItem,
-                        false,
-                        firstIndex,
-                        sortedPairs.Count,
-                        allIndices
-                    ));
-
-                    if (result.Count >= WheelConfig.SLOT_COUNT - 1)
-                    {
-                        break;
-                    }
-                }
-
-                return result;
-            }
-
-            // 🆕 其他类别的原有逻辑
-            // 背包中收集匹配的物品（包括物品插槽中的物品）
-            for (int backpackIndex = 0; backpackIndex < _inventory.Content.Count; backpackIndex++)
-            {
-                Item item = _inventory.Content[backpackIndex];
-                if (item == null)
-                {
-                    continue;
-                }
-
-                // 1. 检查背包物品本身是否匹配
-                if (MatchesCategory(item, category) && !addedItems.Contains(item))
-                {
-                    result.Add(new CollectedItemInfo(item, false, backpackIndex));
-                    addedItems.Add(item);
-
-                    if (result.Count >= WheelConfig.SLOT_COUNT - 1)
-                    {
-                        break;
-                    }
-                }
-
-                // 2. 🆕 检查物品的插槽中是否有匹配的物品（只搜索一层）
-                if (item.Slots != null)
-                {
-                    try
-                    {
-                        foreach (var slot in item.Slots)
-                        {
-                            if (slot == null || slot.Content == null)
-                            {
-                                continue;
-                            }
-
-                            Item slotItem = slot.Content;
-                            if (MatchesCategory(slotItem, category) && !addedItems.Contains(slotItem))
-                            {
-                                result.Add(new CollectedItemInfo(slotItem, true, backpackIndex));
-                                addedItems.Add(slotItem);
-
-                                if (result.Count >= WheelConfig.SLOT_COUNT - 1)
-                                {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (result.Count >= WheelConfig.SLOT_COUNT - 1)
-                        {
-                            break;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning($"[ItemWheel] 搜索物品插槽失败: {item.DisplayName}, {ex.Message}");
-                    }
-                }
-            }
-
-            // 近战：总是将角色近战槽中的武器纳入候选（避免无背包近战时刷新失败）
+            // 🆕 近战特殊处理：包括装备槽中的武器
             if (category == ItemWheelCategory.Melee)
             {
-                try
-                {
-                    var character = CharacterMainControl.Main ?? _character;
-                    var meleeSlot = character != null ? character.MeleeWeaponSlot() : null;
-                    var slotItem = meleeSlot != null ? meleeSlot.Content : null;
-                    if (slotItem != null && MatchesCategory(slotItem, ItemWheelCategory.Melee))
-                    {
-                        if (!addedItems.Contains(slotItem))
-                        {
-                            // 近战槽物品标记为来自插槽，背包索引为-1（特殊处理）
-                            result.Add(new CollectedItemInfo(slotItem, true, -1));
-                            addedItems.Add(slotItem);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[ItemWheel] 收集近战槽物品失败: {ex.Message}");
-                }
+                return ItemCollector.CollectMelee(
+                    _inventory,
+                    _character,
+                    item => MatchesCategory(item, category),
+                    ModSettingFacade.Settings
+                );
             }
 
-            return result;
+            // 🆕 其他类别统一使用 ItemCollector
+            return ItemCollector.Collect(
+                _inventory,
+                category,
+                item => MatchesCategory(item, category),
+                ModSettingFacade.Settings,
+                enableStacking
+            );
         }
 
         /// <summary>
@@ -1370,15 +1201,18 @@ namespace ItemWheel
                                 if (kvp.Value.Item != null && kvp.Value.Item.TypeID.ToString() == targetTypeId)
                                 {
                                     // 选择最后一个手雷
-                                    if (kvp.Value.AllBackpackIndices != null && kvp.Value.AllBackpackIndices.Count > 0)
+                                    if (kvp.Value.AllLocations != null && kvp.Value.AllLocations.Count > 0)
                                     {
-                                        int lastIndex = kvp.Value.AllBackpackIndices.Count - 1;
-                                        int backpackIndex = kvp.Value.AllBackpackIndices[lastIndex];
+                                        int lastIndex = kvp.Value.AllLocations.Count - 1;
+                                        ItemLocation lastLocation = kvp.Value.AllLocations[lastIndex];
 
-                                        if (backpackIndex < _inventory.Content.Count)
+                                        // 🆕 从正确的背包获取手雷（支持主背包/宠物背包/容器）
+                                        if (lastLocation.Inventory?.Content != null &&
+                                            lastLocation.BackpackIndex >= 0 &&
+                                            lastLocation.BackpackIndex < lastLocation.Inventory.Content.Count)
                                         {
-                                            grenadeToEquip = _inventory.Content[backpackIndex];
-                                            Debug.Log($"[ItemWheel] 💣 选择最后一个手雷装备: {grenadeToEquip?.DisplayName}, 背包索引={backpackIndex}");
+                                            grenadeToEquip = lastLocation.Inventory.Content[lastLocation.BackpackIndex];
+                                            Debug.Log($"[ItemWheel] 💣 选择最后一个手雷装备: {grenadeToEquip?.DisplayName}, 位置={lastLocation}");
                                         }
                                     }
                                     break;
@@ -1454,6 +1288,56 @@ namespace ItemWheel
         }
 
         /// <summary>
+        /// 🆕 阶段3：拖拽验证实现
+        /// 检查槽位是否可拖拽，只允许主背包顶层的单物品拖拽
+        /// </summary>
+        private (bool canDrag, string reason) CanDragSlotImpl(CategoryWheel wheel, int slotIndex)
+        {
+            // 基础检查：槽位索引有效
+            if (slotIndex < 0 || slotIndex >= wheel.DisplayedItems.Count)
+            {
+                return (false, "无效槽位");
+            }
+
+            // 获取物品信息
+            var itemInfo = wheel.DisplayedItems[slotIndex];
+            if (itemInfo.Item == null)
+            {
+                // 空槽位不能拖拽
+                return (false, "空槽位");
+            }
+
+            // 检查1：堆叠物品不可拖拽
+            if (itemInfo.StackCount > 1)
+            {
+                BubbleNotifier.Show("堆叠的，拖不动");
+                return (false, "堆叠物品");
+            }
+
+            // 检查2：只有主背包顶层物品可拖拽
+            if (!itemInfo.IsDraggable)
+            {
+                // 根据来源显示不同提示
+                if (itemInfo.IsFromPet && itemInfo.IsFromSlot)
+                {
+                    BubbleNotifier.Show("狗子容器里的，别动");
+                }
+                else if (itemInfo.IsFromPet)
+                {
+                    BubbleNotifier.Show("狗子的东西，别动");
+                }
+                else if (itemInfo.IsFromSlot)
+                {
+                    BubbleNotifier.Show("在容器里，拖不了");
+                }
+                return (false, "非主背包物品");
+            }
+
+            // 允许拖拽
+            return (true, null);
+        }
+
+        /// <summary>
         /// 🆕 处理轮盘槽位交换事件：当玩家拖拽轮盘物品时，同步到背包
         /// 参考 MainBackpackWheelManager.OnWheelSlotsSwapped (行1247-1261)
         /// 参考 MainBackpackWheelManager.AdjustWheelPosition (行1271-1374)
@@ -1472,15 +1356,8 @@ namespace ItemWheel
                 return;
             }
 
-            // 🆕 检查是否有插槽物品参与交换，如果有则禁止
-            if (wheel.IsFromSlot != null)
-            {
-                if (wheel.IsFromSlot[fromWheelPos] || wheel.IsFromSlot[toWheelPos])
-                {
-                    Debug.LogWarning($"[轮盘] ⚠️ 禁止拖拽插槽物品: from={fromWheelPos}(slot={wheel.IsFromSlot[fromWheelPos]}), to={toWheelPos}(slot={wheel.IsFromSlot[toWheelPos]})");
-                    return;
-                }
-            }
+            // 🗑️ 拖拽验证已在 CanDragSlotImpl + OnBeginDrag 阶段完成，此处不再需要检查
+            // 如果执行到这里，说明拖拽已通过验证（只有主背包顶层单物品）
 
             if (wheel.WheelToBackpackMapping == null || wheel.BackpackToWheelMapping == null)
             {

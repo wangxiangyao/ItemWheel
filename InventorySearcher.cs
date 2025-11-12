@@ -26,15 +26,21 @@ namespace ItemWheel
         public bool IsFromPet;
 
         /// <summary>
+        /// 🆕 容器槽位索引（仅当 IsFromSlot=true 时有效，-1表示顶层物品）
+        /// </summary>
+        public int SlotIndex;
+
+        /// <summary>
         /// 构造函数
         /// </summary>
-        public SearchResult(Item item, int backpackIndex, Inventory source, bool isFromSlot, bool isFromPet)
+        public SearchResult(Item item, int backpackIndex, Inventory source, bool isFromSlot, bool isFromPet, int slotIndex = -1)
         {
             Item = item;
             BackpackIndex = backpackIndex;
             Source = source;
             IsFromSlot = isFromSlot;
             IsFromPet = isFromPet;
+            SlotIndex = slotIndex;
         }
     }
 
@@ -89,8 +95,10 @@ namespace ItemWheel
                     {
                         try
                         {
-                            foreach (var slot in item.Slots)
+                            // 🆕 使用 for 循环记录槽位索引
+                            for (int slotIndex = 0; slotIndex < item.Slots.Count; slotIndex++)
                             {
+                                var slot = item.Slots[slotIndex];
                                 if (slot?.Content == null)
                                     continue;
 
@@ -98,7 +106,8 @@ namespace ItemWheel
 
                                 if (matchPredicate(slotItem) && !addedItems.Contains(slotItem))
                                 {
-                                    results.Add(new SearchResult(slotItem, backpackIndex, inventory, true, isPetInventory));
+                                    // 传递正确的 slotIndex
+                                    results.Add(new SearchResult(slotItem, backpackIndex, inventory, true, isPetInventory, slotIndex));
                                     addedItems.Add(slotItem);
                                 }
                             }
@@ -153,11 +162,11 @@ namespace ItemWheel
         /// 根据设置智能获取要搜索的背包列表
         /// </summary>
         /// <param name="inventory">主背包</param>
-        /// <param name="settings">设置</param>
+        /// <param name="searchInPetInventory">是否搜索宠物背包</param>
         /// <returns>背包列表</returns>
         public static List<Inventory> GetInventoriesToSearch(
             Inventory inventory,
-            ItemWheelModSettings settings)
+            bool searchInPetInventory)
         {
             var inventories = new List<Inventory>();
 
@@ -167,7 +176,7 @@ namespace ItemWheel
             }
 
             // 如果启用了宠物背包搜索且宠物背包存在
-            if (settings.SearchInPetInventory && PetProxy.PetInventory != null)
+            if (searchInPetInventory && PetProxy.PetInventory != null)
             {
                 inventories.Add(PetProxy.PetInventory);
             }

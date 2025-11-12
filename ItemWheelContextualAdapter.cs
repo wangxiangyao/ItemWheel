@@ -2,11 +2,10 @@ using System;
 using ItemStatsSystem;
 using QuickWheel.Core.Interfaces;
 using UnityEngine;
+using ItemWheel.Data;
 
 namespace ItemWheel
 {
-    using CategoryWheel = ItemWheel.ItemWheelSystem.CategoryWheel; // 🆕 显式导入 CategoryWheel 类型
-    using CollectedItemInfo = ItemWheel.ItemWheelSystem.CollectedItemInfo; // 🆕 显式导入 CollectedItemInfo 类型
     using ItemWheelCategory = ItemWheel.ItemWheelSystem.ItemWheelCategory; // 🆕 显式导入 ItemWheelCategory 类型
     /// <summary>
     /// 上下文感知的物品适配器，能够访问轮盘信息以获取堆叠数量等自定义数据

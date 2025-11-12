@@ -4,6 +4,7 @@ using HarmonyLib;
 using Duckov.Modding;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using ItemWheel.Integration;
 
 namespace ItemWheel
 {
@@ -11,7 +12,7 @@ namespace ItemWheel
     {
         private static ModBehaviour _instance;
         private Harmony _harmony;
-        // private ItemWheelSystem _wheelSystem; // 🚫 步骤1隔离：暂不初始化
+        private ItemWheelSystem _wheelSystem;
 
         private void Awake()
         {
@@ -24,116 +25,35 @@ namespace ItemWheel
             _instance = this;
             DontDestroyOnLoad(gameObject);
 
+            // 创建轮盘系统
+            _wheelSystem = new ItemWheelSystem();
+
             _harmony = new Harmony("com.duckov.itemwheel");
             _harmony.PatchAll(typeof(ModBehaviour).Assembly);
         }
 
         /// <summary>
-        /// 游戏和ModManager初始化完成后调用（主要注册路径）
+        /// 游戏和ModManager初始化完成后调用
+        /// 这是初始化 ModSetting 的正确时机
         /// </summary>
         protected override void OnAfterSetup()
         {
-            string assemblyPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-            string modDir = System.IO.Path.GetDirectoryName(assemblyPath);
-            string modSettingPath = System.IO.Path.Combine(modDir, "Integration", "ModSettingAPI.cs");
-
-            if (System.IO.File.Exists(modSettingPath))
-            {
-                if (ModSettingAPI.Init(this.info))
-                {
-                    RegisterModSettingUI();
-                }
-            }
-        }
-
-        /// <summary>
-        /// 尝试获取已保存的值，如果不存在则返回默认值
-        /// </summary>
-        private bool GetSavedBoolValue(string key, bool defaultValue)
-        {
-            if (ModSettingAPI.GetSavedValue<bool>(key, out bool savedValue))
-            {
-                return savedValue;
-            }
-            return defaultValue;
-        }
-
-        /// <summary>
-        /// 注册ModSetting配置UI（参考EliteEnemies的实现）
-        /// </summary>
-        private void RegisterModSettingUI()
-        {
+            // 🆕 在 OnAfterSetup 中初始化 ModSettingFacade
+            // 因为此时 ModSetting 才准备好
             try
             {
-                // 搜索设置
-                ModSettingAPI.AddToggle("ItemWheel_SearchInSlots",
-                    "搜索容器内的物品",
-                    GetSavedBoolValue("ItemWheel_SearchInSlots", true),
-                    value => { /* Settings callback */ });
-
-                ModSettingAPI.AddToggle("ItemWheel_SearchInPetInventory",
-                    "搜索宠物背包",
-                    GetSavedBoolValue("ItemWheel_SearchInPetInventory", true),
-                    value => { /* Settings callback */ });
-
-                // 轮盘类别
-                ModSettingAPI.AddToggle("ItemWheel_EnableMedical",
-                    "医疗品轮盘 (3)",
-                    GetSavedBoolValue("ItemWheel_EnableMedical", true),
-                    value => { /* Settings callback */ });
-
-                ModSettingAPI.AddToggle("ItemWheel_EnableStim",
-                    "刺激物轮盘 (4)",
-                    GetSavedBoolValue("ItemWheel_EnableStim", true),
-                    value => { /* Settings callback */ });
-
-                ModSettingAPI.AddToggle("ItemWheel_EnableFood",
-                    "食物轮盘 (5)",
-                    GetSavedBoolValue("ItemWheel_EnableFood", true),
-                    value => { /* Settings callback */ });
-
-                ModSettingAPI.AddToggle("ItemWheel_EnableExplosive",
-                    "手雷轮盘 (6)",
-                    GetSavedBoolValue("ItemWheel_EnableExplosive", true),
-                    value => { /* Settings callback */ });
-
-                ModSettingAPI.AddToggle("ItemWheel_EnableMelee",
-                    "近战武器轮盘 (V)",
-                    GetSavedBoolValue("ItemWheel_EnableMelee", true),
-                    value => { /* Settings callback */ });
-
-                ModSettingAPI.AddToggle("ItemWheel_EnableAmmo",
-                    "子弹轮盘 (长按R)",
-                    GetSavedBoolValue("ItemWheel_EnableAmmo", true),
-                    value => { /* Settings callback */ });
-
-                // 特殊功能
-                ModSettingAPI.AddToggle("ItemWheel_EnableBulletTime",
-                    "子弹时间 (开发中)",
-                    GetSavedBoolValue("ItemWheel_EnableBulletTime", false),
-                    value => { /* Settings callback */ });
-
-                // UI设置
-                ModSettingAPI.AddToggle("ItemWheel_ShowItemCount",
-                    "显示物品数量",
-                    GetSavedBoolValue("ItemWheel_ShowItemCount", true),
-                    value => { /* Settings callback */ });
-
-                ModSettingAPI.AddToggle("ItemWheel_ShowDurabilityBar",
-                    "显示耐久条",
-                    GetSavedBoolValue("ItemWheel_ShowDurabilityBar", true),
-                    value => { /* Settings callback */ });
+                ModSettingFacade.Initialize(this.info);
+                Debug.Log($"[ItemWheel] ModSetting available: {ModSettingFacade.IsModSettingAvailable}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[ItemWheel] 注册配置UI失败: {ex.Message}\n{ex.StackTrace}");
+                Debug.LogError($"[ItemWheel] Failed to initialize ModSettingFacade: {ex.Message}");
             }
         }
 
         private void Update()
         {
-            // 🚫 步骤1隔离：暂不更新ItemWheelSystem
-            // _wheelSystem?.Update();
+            _wheelSystem?.Update(); // ✅ 步骤2恢复：更新轮盘系统
         }
 
         private void OnDestroy()
@@ -141,14 +61,12 @@ namespace ItemWheel
             if (_instance == this)
             {
                 _harmony?.UnpatchAll(_harmony.Id);
-                // 🚫 步骤1隔离：暂不处理ItemWheelSystem
-                // _wheelSystem?.Dispose();
+                _wheelSystem?.Dispose(); // ✅ 步骤2恢复：释放轮盘系统
                 _instance = null;
             }
         }
 
-        // 🚫 步骤1隔离：暂不注册Harmony补丁
-        /*
+        // ✅ 步骤2恢复：Harmony输入补丁
         [HarmonyPatch(typeof(CharacterInputControl))]
         private static class CharacterInputPatch
         {
@@ -275,7 +193,6 @@ namespace ItemWheel
             3 => ItemWheelSystem.ItemWheelCategory.Explosive,
             _ => ItemWheelSystem.ItemWheelCategory.Medical
         };
-        */
     }
 }
 

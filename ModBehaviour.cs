@@ -109,6 +109,15 @@ namespace ItemWheel
             {
                 if (_instance == null) return true;
 
+                bool isEnabled = ModSettingFacade.Settings.IsWheelEnabled(ItemWheelSystem.ItemWheelCategory.Melee);
+                Debug.Log($"[ItemWheel] 近战快捷键触发, 轮盘启用状态: {isEnabled}, context: {context.phase}");
+
+                if (!isEnabled)
+                {
+                    Debug.Log($"[ItemWheel] 近战轮盘已禁用，允许原始输入");
+                    return true;
+                }
+
                 try
                 {
                     // started: 开始计时（不拦截官方方法）
@@ -192,6 +201,15 @@ namespace ItemWheel
         private bool HandleShortcutContext(int shortcutIndex, InputAction.CallbackContext context)
         {
             var category = GetItemCategoryForShortcut(shortcutIndex);
+            bool isEnabled = ModSettingFacade.Settings.IsWheelEnabled(category);
+
+            Debug.Log($"[ItemWheel] 快捷键 {shortcutIndex} ({category}) 触发, 轮盘启用状态: {isEnabled}, context: {context.phase}");
+
+            if (!isEnabled)
+            {
+                Debug.Log($"[ItemWheel] 轮盘 {category} 已禁用，允许原始输入");
+                return true;
+            }
 
             if (context.started || (context.performed && !context.canceled))
                 _wheelSystem.OnKeyPressed(category);
@@ -212,4 +230,3 @@ namespace ItemWheel
         };
     }
 }
-

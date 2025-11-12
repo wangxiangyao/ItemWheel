@@ -59,7 +59,12 @@ namespace ItemWheel.Integration
 
                 if (_isModSettingAvailable)
                 {
-                    Debug.Log("[ItemWheel] ModSetting available, registering UI...");
+                    Debug.Log("[ItemWheel] ModSetting available, loading saved values...");
+
+                    // 🆕 关键修复：先加载保存的值到_settings对象
+                    LoadSavedSettings();
+
+                    Debug.Log("[ItemWheel] Registering UI with loaded settings...");
                     RegisterModSettingUI();
                     Debug.Log("[ItemWheel] ModSetting initialized successfully");
                 }
@@ -109,35 +114,55 @@ namespace ItemWheel.Integration
                     "ItemWheel_EnableMedical",
                     "医疗品轮盘 (3)",
                     GetSavedValue("ItemWheel_EnableMedical", _settings.EnableMedicalWheel),
-                    value => _settings.EnableMedicalWheel = value
+                    value =>
+                    {
+                        Debug.Log($"[ItemWheel] 设置更新: EnableMedicalWheel = {value}");
+                        _settings.EnableMedicalWheel = value;
+                    }
                 );
 
                 ModSettingAPI.AddToggle(
                     "ItemWheel_EnableStim",
                     "刺激物轮盘 (4)",
                     GetSavedValue("ItemWheel_EnableStim", _settings.EnableStimWheel),
-                    value => _settings.EnableStimWheel = value
+                    value =>
+                    {
+                        Debug.Log($"[ItemWheel] 设置更新: EnableStimWheel = {value}");
+                        _settings.EnableStimWheel = value;
+                    }
                 );
 
                 ModSettingAPI.AddToggle(
                     "ItemWheel_EnableFood",
                     "食物轮盘 (5)",
                     GetSavedValue("ItemWheel_EnableFood", _settings.EnableFoodWheel),
-                    value => _settings.EnableFoodWheel = value
+                    value =>
+                    {
+                        Debug.Log($"[ItemWheel] 设置更新: EnableFoodWheel = {value}");
+                        _settings.EnableFoodWheel = value;
+                    }
                 );
 
                 ModSettingAPI.AddToggle(
                     "ItemWheel_EnableExplosive",
                     "手雷轮盘 (6)",
                     GetSavedValue("ItemWheel_EnableExplosive", _settings.EnableExplosiveWheel),
-                    value => _settings.EnableExplosiveWheel = value
+                    value =>
+                    {
+                        Debug.Log($"[ItemWheel] 设置更新: EnableExplosiveWheel = {value}");
+                        _settings.EnableExplosiveWheel = value;
+                    }
                 );
 
                 ModSettingAPI.AddToggle(
                     "ItemWheel_EnableMelee",
                     "近战武器轮盘 (V)",
                     GetSavedValue("ItemWheel_EnableMelee", _settings.EnableMeleeWheel),
-                    value => _settings.EnableMeleeWheel = value
+                    value =>
+                    {
+                        Debug.Log($"[ItemWheel] 设置更新: EnableMeleeWheel = {value}");
+                        _settings.EnableMeleeWheel = value;
+                    }
                 );
 
                 ModSettingAPI.AddToggle(
@@ -220,19 +245,17 @@ namespace ItemWheel.Integration
         }
 
         /// <summary>
-        /// 重新加载配置（用于调试）
+        /// 🆕 加载保存的配置到_settings对象（初始化时调用）
         /// </summary>
-        public static void ReloadSettings()
+        private static void LoadSavedSettings()
         {
-            if (!_isInitialized || !_isModSettingAvailable)
+            if (!_isModSettingAvailable)
             {
-                Debug.LogWarning("[ItemWheel] Cannot reload settings: not initialized or ModSetting not available");
+                Debug.Log("[ItemWheel] ModSetting not available, skipping load");
                 return;
             }
 
-            Debug.Log("[ItemWheel] Reloading settings...");
-
-            // 重新读取所有保存的值
+            // 读取所有保存的值
             _settings.SearchInSlots = GetSavedValue("ItemWheel_SearchInSlots", true);
             _settings.SearchInPetInventory = GetSavedValue("ItemWheel_SearchInPetInventory", true);
             _settings.EnableMedicalWheel = GetSavedValue("ItemWheel_EnableMedical", true);
@@ -247,6 +270,22 @@ namespace ItemWheel.Integration
             _settings.ShowRightText = GetSavedValue("ItemWheel_ShowRightText", true);
             _settings.EnableBulletTime = GetSavedValue("ItemWheel_EnableBulletTime", false);
 
+            Debug.Log($"[ItemWheel] Settings loaded from config:\n{_settings}");
+        }
+
+        /// <summary>
+        /// 重新加载配置（用于调试）
+        /// </summary>
+        public static void ReloadSettings()
+        {
+            if (!_isInitialized || !_isModSettingAvailable)
+            {
+                Debug.LogWarning("[ItemWheel] Cannot reload settings: not initialized or ModSetting not available");
+                return;
+            }
+
+            Debug.Log("[ItemWheel] Reloading settings...");
+            LoadSavedSettings();
             Debug.Log($"[ItemWheel] Settings reloaded:\n{_settings}");
         }
     }

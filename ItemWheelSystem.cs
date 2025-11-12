@@ -160,6 +160,11 @@ namespace ItemWheel
         /// <returns>是否成功显示</returns>
         public bool ShowWheel(ItemWheelCategory category, Vector2? wheelCenter = null)
         {
+            if (!IsCategoryEnabled(category))
+            {
+                return false;
+            }
+
             var wheel = EnsureWheel(category);
 
             // 🆕 打开轮盘时不重置选择，也不修改快捷栏（保持官方快捷栏不变）
@@ -239,6 +244,11 @@ namespace ItemWheel
         // 本次显示期间是否发生过交换（会话级，按类别记录）
         private readonly Dictionary<ItemWheelCategory, bool> _sessionSwapped = new();
 
+        private static bool IsCategoryEnabled(ItemWheelCategory category)
+        {
+            return ModSettingFacade.Settings.IsWheelEnabled(category);
+        }
+
         /// <summary>
         /// 按键按下事件（由ModBehavior调用）
         /// 开始长按计时
@@ -246,6 +256,11 @@ namespace ItemWheel
         /// <param name="category">物品类别</param>
         public void OnKeyPressed(ItemWheelCategory category)
         {
+            if (!IsCategoryEnabled(category))
+            {
+                return;
+            }
+
             if (!_keyStates.TryGetValue(category, out var state))
             {
                 state = new KeyState();
@@ -268,6 +283,11 @@ namespace ItemWheel
         /// <param name="category">物品类别</param>
         public void OnKeyReleased(ItemWheelCategory category)
         {
+            if (!IsCategoryEnabled(category))
+            {
+                return;
+            }
+
             if (!_keyStates.TryGetValue(category, out var state))
             {
                 return;
@@ -300,6 +320,11 @@ namespace ItemWheel
         /// </summary>
         public bool HasTriggeredWheel(ItemWheelCategory category)
         {
+            if (!IsCategoryEnabled(category))
+            {
+                return false;
+            }
+
             if (_keyStates.TryGetValue(category, out var state))
             {
                 return state.HasTriggeredWheel;
@@ -313,6 +338,11 @@ namespace ItemWheel
         /// <param name="category">物品类别</param>
         private void UseShortcutDirect(ItemWheelCategory category)
         {
+            if (!IsCategoryEnabled(category))
+            {
+                return;
+            }
+
             if (!_wheels.TryGetValue(category, out var wheel))
             {
                 return;  // 轮盘还未创建，忽略
@@ -380,6 +410,11 @@ namespace ItemWheel
                 var category = kvp.Key;
                 var state = kvp.Value;
 
+                if (!IsCategoryEnabled(category))
+                {
+                    continue;
+                }
+
                 if (state.IsPressed && !state.HasTriggeredWheel)
                 {
                     state.HoldTime += deltaTime;
@@ -399,6 +434,11 @@ namespace ItemWheel
         /// </summary>
         private void ConfirmWheelSelection(ItemWheelCategory category)
         {
+            if (!IsCategoryEnabled(category))
+            {
+                return;
+            }
+
             if (_wheels.TryGetValue(category, out var wheel))
             {
                 // 若本次显示期间发生过交换，关闭时不使用物品，直接取消

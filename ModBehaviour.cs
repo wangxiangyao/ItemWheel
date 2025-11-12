@@ -192,7 +192,23 @@ namespace ItemWheel
             private static bool OnMouseScrollerInputPrefix(InputAction.CallbackContext context)
             {
                 if (_instance?._wheelSystem?.HasActiveWheel == true)
-                    return false;  // 轮盘显示时阻止滚轮输入
+                {
+                    // 轮盘显示时，拦截游戏滚轮输入，但转发给轮盘系统处理
+                    if (context.performed)
+                    {
+                        Vector2 scrollValue = context.ReadValue<Vector2>();
+                        float scrollY = scrollValue.y;
+
+                        Debug.Log($"[ItemWheel] 滚轮输入拦截: scrollY={scrollY}");
+
+                        if (Mathf.Abs(scrollY) > 0.01f)
+                        {
+                            int direction = scrollY > 0 ? -1 : 1;
+                            _instance._wheelSystem.OnWheelScroll(direction);
+                        }
+                    }
+                    return false;
+                }
 
                 return true;
             }

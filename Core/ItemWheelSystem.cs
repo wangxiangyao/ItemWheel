@@ -338,6 +338,98 @@ namespace ItemWheel
         }
 
         /// <summary>
+        /// 鼠标滚轮切换当前显示轮盘的选中槽位
+        /// </summary>
+        /// <param name="direction">滚轮方向：正数表示向后，负数表示向前</param>
+        public void OnWheelScroll(int direction)
+        {
+            if (direction == 0)
+            {
+                return;
+            }
+
+            CategoryWheel activeWheel = null;
+            foreach (var wheel in _wheels.Values)
+            {
+                if (wheel?.Wheel != null && wheel.Wheel.IsVisible)
+                {
+                    activeWheel = wheel;
+                    break;
+                }
+            }
+
+            if (activeWheel == null)
+            {
+                return;
+            }
+
+            var quickWheel = activeWheel.Wheel;
+            if (quickWheel == null)
+            {
+                return;
+            }
+
+            int slotCount = quickWheel.Config?.SlotCount ?? WheelConfig.SLOT_COUNT;
+            if (slotCount <= 0)
+            {
+                return;
+            }
+
+            int currentIndex = quickWheel.GetSelectedIndex();
+            if (currentIndex < 0)
+            {
+                currentIndex = activeWheel.LastConfirmedIndex;
+            }
+            if (currentIndex < 0)
+            {
+                currentIndex = 0;
+            }
+
+            int attempts = 0;
+            int nextIndex = currentIndex;
+            while (attempts < slotCount)
+            {
+                nextIndex = WrapWheelIndex(nextIndex + direction, slotCount);
+                attempts++;
+
+                // 跳过中心槽（索引 slotCount - 1）
+                if (nextIndex == slotCount - 1)
+                {
+                    continue;
+                }
+
+                if (nextIndex < 0 || nextIndex >= activeWheel.Slots.Length)
+                {
+                    continue;
+                }
+
+                if (activeWheel.Slots[nextIndex] == null)
+                {
+                    continue;
+                }
+
+                quickWheel.SetSelectedIndex(nextIndex);
+                OnSelectionChanged(activeWheel, nextIndex);
+                return;
+            }
+        }
+
+        private static int WrapWheelIndex(int index, int slotCount)
+        {
+            if (slotCount <= 0)
+            {
+                return 0;
+            }
+
+            int normalized = index % slotCount;
+            if (normalized < 0)
+            {
+                normalized += slotCount;
+            }
+            return normalized;
+        }
+
+        /// <summary>
         /// 每帧更新方法（处理长按计时和轮盘逻辑）
         /// </summary>
         public void Update()

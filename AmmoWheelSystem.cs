@@ -117,10 +117,21 @@ namespace ItemWheel
                     cfg.GridCellSize = 90f;
                     cfg.GridSpacing = 12f;
                     cfg.DeadZoneRadius = 40f; // 死区半径（像素）
+
+                    // 启用点击选择（修复点击无效问题）
+                    cfg.EnableClickSelect = true;
+
                     // 🆕 使用 WheelSpriteLoader 加载的自定义格子Sprite
                     cfg.SlotNormalSprite = WheelSpriteLoader.SlotNormal;
                     cfg.SlotHoverSprite = WheelSpriteLoader.SlotHover;
                     cfg.SlotSelectedSprite = WheelSpriteLoader.SlotSelected;
+
+                    // 子弹拖拽验证：子弹是堆叠物品，全部禁止拖拽
+                    cfg.CanDragSlot = (slotIndex) =>
+                    {
+                        BubbleNotifier.Show("子弹拖不了");
+                        return (false, "堆叠物品");
+                    };
                 })
                 .WithAdapter(new BulletWheelAdapter(_bulletTypeCounts))
                 .WithView(_view)

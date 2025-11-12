@@ -44,6 +44,9 @@ namespace ItemWheel
 
         // CategoryWheel 已移到 ItemWheel.Data.CategoryWheel
 
+        // 🆕 单例实例（用于静态方法访问）
+        private static ItemWheelSystem _instance;
+
         [System.NonSerialized]
         private Dictionary<ItemWheelCategory, CategoryWheel> _wheels;
 
@@ -61,6 +64,7 @@ namespace ItemWheel
 
         public ItemWheelSystem()
         {
+            _instance = this;
             _wheels = new Dictionary<ItemWheelCategory, CategoryWheel>();
             LevelManager.OnLevelInitialized += HandleLevelInitialized;
 
@@ -394,6 +398,12 @@ namespace ItemWheel
             }
 
             _wheels.Clear();
+
+            // 清除单例引用
+            if (_instance == this)
+            {
+                _instance = null;
+            }
         }
 
         /// <summary>
@@ -543,6 +553,20 @@ namespace ItemWheel
                             {
                                 affectedWheel.LastConfirmedIndex = restoredIndex;
                                 Debug.Log($"[轮盘] ✅ 恢复选中项: {previouslySelectedItem.DisplayName}, 位置: {restoredIndex}");
+                            }
+                            else
+                            {
+                                // 物品不存在了（如容器物品被使用），选择下一个可用物品
+                                affectedWheel.LastConfirmedIndex = GetFirstAvailableItemIndex(affectedWheel);
+                                Debug.Log($"[轮盘] ⚠️ 选中的物品已消失: {previouslySelectedItem.DisplayName}, 自动选择下一个: 位置={affectedWheel.LastConfirmedIndex}");
+
+                                // 同步到快捷栏（非近战类别）
+                                if (affectedWheel.Category != ItemWheelCategory.Melee && affectedWheel.LastConfirmedIndex >= 0)
+                                {
+                                    var shortcutIndex = (int)affectedWheel.Category;
+                                    var newItem = affectedWheel.Slots[affectedWheel.LastConfirmedIndex];
+                                    Duckov.ItemShortcut.Set(shortcutIndex, newItem);
+                                }
                             }
                         }
                     }
@@ -1239,8 +1263,11 @@ namespace ItemWheel
         {
             if (item?.UsageUtilities != null && item.UsageUtilities.IsUsable(item, character))
             {
+                // 🆕 使用物品前，订阅销毁事件（用于容器物品消失后刷新快捷栏）
+                SubscribeToItemDestroy(item);
+
                 character.UseItem(item);
-                // 使用成功（满足 IsUsable）后，重置“不可使用”情绪计数回到平静
+                // 使用成功（满足 IsUsable）后，重置"不可使用"情绪计数回到平静
                 try
                 {
                     ConditionHintManager.Reset(ConditionHintManager.HintCondition.ItemNotUsable);
@@ -1621,6 +1648,87 @@ namespace ItemWheel
             catch (System.Exception ex)
             {
                 Debug.LogError($"[ItemWheel] Failed to save mappings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 🆕 阶段3：订阅物品销毁事件
+        /// 用于处理容器物品使用后快捷栏自动更新
+        /// </summary>
+        private static void SubscribeToItemDestroy(Item item)
+        {
+            if (item == null || item.gameObject == null)
+            {
+                return;
+            }
+
+            // 查找物品属于哪个类别
+            ItemWheelCategory? category = null;
+            if (item.Tags != null)
+            {
+                foreach (var tag in item.Tags)
+                {
+                    if (tag != null && TagMappings.TryGetValue(tag.name, out ItemWheelCategory cat))
+                    {
+                        category = cat;
+                        break;
+                    }
+                }
+            }
+
+            if (!category.HasValue)
+            {
+                // 不属于ItemWheel管理的类别（如子弹），跳过
+                return;
+            }
+
+            // 添加销毁监听组件
+            var listener = item.gameObject.AddComponent<ItemDestroyListener>();
+            listener.Category = category.Value;
+            Debug.Log($"[ItemWheel] 🔔 订阅物品销毁事件: {item.DisplayName} -> {category.Value}");
+        }
+
+        /// <summary>
+        /// 🆕 阶段3：刷新指定类别的快捷栏（物品销毁后调用）
+        /// </summary>
+        private static void RefreshShortcutAfterItemDestroy(ItemWheelCategory category)
+        {
+            if (_instance == null || !_instance._wheels.TryGetValue(category, out CategoryWheel wheel))
+            {
+                return;
+            }
+
+            Debug.Log($"[ItemWheel] 🔄 物品销毁，刷新快捷栏: {category}");
+
+            // 刷新该类别的槽位
+            _instance.RefreshCategorySlots(wheel, resetSelection: false);
+
+            // 选择下一个可用物品
+            int newIndex = GetFirstAvailableItemIndex(wheel);
+            wheel.LastConfirmedIndex = newIndex;
+
+            // 同步到快捷栏（非近战类别）
+            if (category != ItemWheelCategory.Melee && newIndex >= 0)
+            {
+                var shortcutIndex = (int)category;
+                var newItem = wheel.Slots[newIndex];
+                Duckov.ItemShortcut.Set(shortcutIndex, newItem);
+                Debug.Log($"[ItemWheel] ✅ 快捷栏已更新: 槽位{shortcutIndex} -> {newItem?.DisplayName ?? "null"}");
+            }
+        }
+
+        /// <summary>
+        /// 🆕 阶段3：物品销毁监听器（MonoBehaviour组件）
+        /// 当物品GameObject被销毁时，自动刷新对应类别的快捷栏
+        /// </summary>
+        private class ItemDestroyListener : MonoBehaviour
+        {
+            public ItemWheelCategory Category;
+
+            private void OnDestroy()
+            {
+                // GameObject销毁时触发快捷栏刷新
+                RefreshShortcutAfterItemDestroy(Category);
             }
         }
     }

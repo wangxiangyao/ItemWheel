@@ -31,6 +31,9 @@ namespace ItemWheel.Data
         /// <summary>上次确认的选中索引</summary>
         public int LastConfirmedIndex;
 
+        /// <summary>🆕 上次选中的物品引用（用于背包变化后准确恢复选中）</summary>
+        public Item LastSelectedItem;
+
         /// <summary>是否首次加载（用于从官方快捷栏同步选中）</summary>
         public bool IsFirstLoad;
 

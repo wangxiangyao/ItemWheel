@@ -118,8 +118,8 @@ namespace ItemWheel
                     cfg.GridSpacing = 12f;
                     cfg.DeadZoneRadius = 40f; // 死区半径（像素）
 
-                    // 启用点击选择（修复点击无效问题）
-                    cfg.EnableClickSelect = true;
+                    // 🆕 禁用点击选择（子弹轮盘点击无实际效果，容易误操作）
+                    cfg.EnableClickSelect = false;
 
                     // 🆕 使用 WheelSpriteLoader 加载的自定义格子Sprite
                     cfg.SlotNormalSprite = WheelSpriteLoader.SlotNormal;

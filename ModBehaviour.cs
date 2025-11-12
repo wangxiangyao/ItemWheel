@@ -66,6 +66,23 @@ namespace ItemWheel
             }
         }
 
+        // ✅ Hook ItemShortcut.Load()，在快捷栏从存档加载完成后初始化轮盘
+        [HarmonyPatch(typeof(Duckov.ItemShortcut), "Load")]
+        private static class ItemShortcutLoadPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix()
+            {
+                Debug.Log("[ItemWheel] ✅ ItemShortcut.Load() 完成，初始化轮盘...");
+
+                // 等快捷栏加载完成后，初始化轮盘
+                if (_instance?._wheelSystem != null)
+                {
+                    _instance._wheelSystem.InitializeAllWheelsOnStart();
+                }
+            }
+        }
+
         // ✅ 步骤2恢复：Harmony输入补丁
         [HarmonyPatch(typeof(CharacterInputControl))]
         private static class CharacterInputPatch

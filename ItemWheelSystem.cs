@@ -63,9 +63,6 @@ namespace ItemWheel
         // 🆕 防止递归事件标志：轮盘拖拽时同步背包，避免触发背包变化事件再次更新轮盘
         private bool _isPerformingSwap = false;
 
-        // 🆕 映射持久化系统
-        private static WheelMappingPersistence _mappingPersistence;
-
         public ItemWheelSystem()
         {
             _instance = this;
@@ -74,9 +71,6 @@ namespace ItemWheel
 
             // 🆕 使用统一的 WheelSpriteLoader 加载自定义格子Sprite
             WheelSpriteLoader.Load();
-
-            // 初始化持久化系统
-            InitializePersistence();
 
             // 🆕 阶段4：初始化Handler
             InitializeHandlers();
@@ -103,38 +97,6 @@ namespace ItemWheel
             Debug.Log("[ItemWheel] Handlers initialized");
         }
 
-        /// <summary>
-        /// 初始化映射持久化系统
-        /// </summary>
-        private static void InitializePersistence()
-        {
-            if (_mappingPersistence != null) return;  // 已经初始化过了
-
-            try
-            {
-                // 获取Mod目录路径
-                string modPath = System.IO.Path.GetDirectoryName(
-                    System.Reflection.Assembly.GetExecutingAssembly().Location
-                );
-
-                _mappingPersistence = new WheelMappingPersistence(modPath);
-                Debug.Log("[ItemWheel] Mapping persistence initialized");
-
-                // 检查是否有保存的映射
-                if (_mappingPersistence.HasSavedMappings())
-                {
-                    Debug.Log("[ItemWheel] Found saved wheel mappings");
-                }
-                else
-                {
-                    Debug.Log("[ItemWheel] No saved wheel mappings found (first time use)");
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[ItemWheel] Failed to initialize persistence: {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// 检查是否有活跃的轮盘
@@ -1566,119 +1528,6 @@ namespace ItemWheel
             {
                 _isPerformingSwap = false;
             }
-
-            SaveAllMappings();
-        }
-
-        /// <summary>
-        /// 尝试加载保存的映射并应用
-        /// </summary>
-        private bool TryLoadSavedMapping(CategoryWheel wheel, List<CollectedItemInfo> collected, Item[] slotBuffer)
-        {
-            if (_mappingPersistence == null || !_mappingPersistence.HasSavedMappings())
-            {
-                return false;
-            }
-
-            try
-            {
-                var savedMappings = _mappingPersistence.Load();
-                if (savedMappings == null || !savedMappings.ContainsKey(wheel.Category))
-                {
-                    return false;
-                }
-
-                var savedMapping = savedMappings[wheel.Category];
-
-                // 清空旧映射
-                System.Array.Fill(wheel.WheelToBackpackMapping, -1);
-                wheel.BackpackToWheelMapping.Clear();
-                System.Array.Fill(wheel.IsFromSlot, false);
-
-                // 🆕 检查是否至少有一个有效映射，如果全为-1则重新生成
-                bool hasAnyValidMapping = false;
-                for (int wheelPos = 0; wheelPos < 8; wheelPos++)
-                {
-                    if (savedMapping[wheelPos] >= 0)
-                    {
-                        hasAnyValidMapping = true;
-                        break;
-                    }
-                }
-
-                if (!hasAnyValidMapping)
-                {
-                    Debug.Log($"[ItemWheel] 🔄 No valid mappings found for {wheel.Category} (all -1), regenerating");
-                    return false;
-                }
-
-                // 验证保存的映射 - 只要有一个映射失败就重新生成
-                for (int wheelPos = 0; wheelPos < 8; wheelPos++)
-                {
-                    int backpackPos = savedMapping[wheelPos];
-                    if (backpackPos < 0) continue;  // 空位跳过
-
-                    // 验证：背包位置是否有效，且物品属于当前类别
-                    if (backpackPos >= _inventory.Content.Count)
-                    {
-                        Debug.LogWarning($"[ItemWheel] 🚨 Mapping validation failed: backpack[{backpackPos}] out of range");
-                        Debug.LogWarning($"[ItemWheel] 🔄 Regenerating mapping for {wheel.Category}");
-                        return false;  // 🚫 一个失败就全部重新生成
-                    }
-
-                    var item = _inventory.GetItemAt(backpackPos);
-                    if (item == null)
-                    {
-                        Debug.LogWarning($"[ItemWheel] 🚨 Mapping validation failed: backpack[{backpackPos}] is empty");
-                        Debug.LogWarning($"[ItemWheel] 🔄 Regenerating mapping for {wheel.Category}");
-                        return false;  // 🚫 一个失败就全部重新生成
-                    }
-
-                    // 检查物品是否在collected列表中（属于当前类别），且来自背包而非插槽
-                    bool foundInCollected = false;
-                    foreach (var itemInfo in collected)
-                    {
-                        if (itemInfo.Item == item && !itemInfo.IsFromSlot && itemInfo.BackpackIndex == backpackPos)
-                        {
-                            foundInCollected = true;
-                            break;
-                        }
-                    }
-
-                    if (!foundInCollected)
-                    {
-                        Debug.LogWarning($"[ItemWheel] 🚨 Mapping validation failed: backpack[{backpackPos}] item '{item.DisplayName}' not in category {wheel.Category} or from slot");
-                        Debug.LogWarning($"[ItemWheel] 🔄 Regenerating mapping for {wheel.Category}");
-                        return false;  // 🚫 一个失败就全部重新生成
-                    }
-                }
-
-                // 所有映射都验证通过，现在应用它们
-                int validMappings = 0;
-                for (int wheelPos = 0; wheelPos < 8; wheelPos++)
-                {
-                    int backpackPos = savedMapping[wheelPos];
-                    if (backpackPos < 0) continue;  // 空位
-
-                    var item = _inventory.GetItemAt(backpackPos);
-                    // 映射有效，应用
-                    slotBuffer[wheelPos] = item;
-                    wheel.WheelToBackpackMapping[wheelPos] = backpackPos;
-                    wheel.BackpackToWheelMapping[backpackPos] = wheelPos;
-                    wheel.IsFromSlot[wheelPos] = false;  // 保存的映射只包含背包物品
-                    validMappings++;
-
-                    Debug.Log($"[ItemWheel] ✓ Restored mapping: wheel[{wheelPos}] <-> backpack[{backpackPos}] ({item.DisplayName})");
-                }
-
-                Debug.Log($"[ItemWheel] ✅ All saved mappings validated for {wheel.Category}: {validMappings} mappings loaded");
-                return true;
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[ItemWheel] Failed to load saved mapping: {ex.Message}");
-                return false;
-            }
         }
 
         /// <summary>
@@ -1730,42 +1579,6 @@ namespace ItemWheel
             }
         }
 
-        /// <summary>
-        /// 保存所有类别的映射
-        /// </summary>
-        private void SaveAllMappings()
-        {
-            if (_mappingPersistence == null)
-            {
-                Debug.LogWarning("[ItemWheel] Cannot save mappings: persistence system not initialized");
-                return;
-            }
-
-            try
-            {
-                var allMappings = new Dictionary<ItemWheelCategory, int[]>();
-
-                // 收集所有类别的映射
-                foreach (var kvp in _wheels)
-                {
-                    var category = kvp.Key;
-                    var wheel = kvp.Value;
-
-                    // 复制映射数组
-                    var mappingCopy = new int[8];
-                    Array.Copy(wheel.WheelToBackpackMapping, mappingCopy, 8);
-                    allMappings[category] = mappingCopy;
-                }
-
-                // 保存到文件
-                _mappingPersistence.Save(allMappings);
-                Debug.Log($"[ItemWheel] ✓ Saved mappings for {allMappings.Count} categories");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[ItemWheel] Failed to save mappings: {ex.Message}");
-            }
-        }
 
         /// <summary>
         /// 🆕 阶段3：订阅物品销毁事件

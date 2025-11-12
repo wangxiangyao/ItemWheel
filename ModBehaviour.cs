@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using HarmonyLib;
+using Duckov.Modding;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using ItemWheel.Integration;
 
 namespace ItemWheel
 {
@@ -22,15 +25,35 @@ namespace ItemWheel
             _instance = this;
             DontDestroyOnLoad(gameObject);
 
+            // 创建轮盘系统
             _wheelSystem = new ItemWheelSystem();
 
             _harmony = new Harmony("com.duckov.itemwheel");
             _harmony.PatchAll(typeof(ModBehaviour).Assembly);
         }
 
+        /// <summary>
+        /// 游戏和ModManager初始化完成后调用
+        /// 这是初始化 ModSetting 的正确时机
+        /// </summary>
+        protected override void OnAfterSetup()
+        {
+            // 🆕 在 OnAfterSetup 中初始化 ModSettingFacade
+            // 因为此时 ModSetting 才准备好
+            try
+            {
+                ModSettingFacade.Initialize(this.info);
+                Debug.Log($"[ItemWheel] ModSetting available: {ModSettingFacade.IsModSettingAvailable}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ItemWheel] Failed to initialize ModSettingFacade: {ex.Message}");
+            }
+        }
+
         private void Update()
         {
-            _wheelSystem?.Update();
+            _wheelSystem?.Update(); // ✅ 步骤2恢复：更新轮盘系统
         }
 
         private void OnDestroy()
@@ -38,11 +61,29 @@ namespace ItemWheel
             if (_instance == this)
             {
                 _harmony?.UnpatchAll(_harmony.Id);
-                _wheelSystem?.Dispose();
+                _wheelSystem?.Dispose(); // ✅ 步骤2恢复：释放轮盘系统
                 _instance = null;
             }
         }
 
+        // ✅ Hook ItemShortcut.Load()，在快捷栏从存档加载完成后初始化轮盘
+        [HarmonyPatch(typeof(Duckov.ItemShortcut), "Load")]
+        private static class ItemShortcutLoadPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix()
+            {
+                Debug.Log("[ItemWheel] ✅ ItemShortcut.Load() 完成，初始化轮盘...");
+
+                // 等快捷栏加载完成后，初始化轮盘
+                if (_instance?._wheelSystem != null)
+                {
+                    _instance._wheelSystem.InitializeAllWheelsOnStart();
+                }
+            }
+        }
+
+        // ✅ 步骤2恢复：Harmony输入补丁
         [HarmonyPatch(typeof(CharacterInputControl))]
         private static class CharacterInputPatch
         {
@@ -67,6 +108,15 @@ namespace ItemWheel
             private static bool OnPlayerSwitchItemAgentMelee_Prefix(InputAction.CallbackContext context)
             {
                 if (_instance == null) return true;
+
+                bool isEnabled = ModSettingFacade.Settings.IsWheelEnabled(ItemWheelSystem.ItemWheelCategory.Melee);
+                Debug.Log($"[ItemWheel] 近战快捷键触发, 轮盘启用状态: {isEnabled}, context: {context.phase}");
+
+                if (!isEnabled)
+                {
+                    Debug.Log($"[ItemWheel] 近战轮盘已禁用，允许原始输入");
+                    return true;
+                }
 
                 try
                 {
@@ -151,6 +201,15 @@ namespace ItemWheel
         private bool HandleShortcutContext(int shortcutIndex, InputAction.CallbackContext context)
         {
             var category = GetItemCategoryForShortcut(shortcutIndex);
+            bool isEnabled = ModSettingFacade.Settings.IsWheelEnabled(category);
+
+            Debug.Log($"[ItemWheel] 快捷键 {shortcutIndex} ({category}) 触发, 轮盘启用状态: {isEnabled}, context: {context.phase}");
+
+            if (!isEnabled)
+            {
+                Debug.Log($"[ItemWheel] 轮盘 {category} 已禁用，允许原始输入");
+                return true;
+            }
 
             if (context.started || (context.performed && !context.canceled))
                 _wheelSystem.OnKeyPressed(category);
@@ -171,4 +230,3 @@ namespace ItemWheel
         };
     }
 }
-

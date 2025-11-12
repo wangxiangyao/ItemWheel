@@ -25,7 +25,32 @@
   <ItemGroup>
     <Compile Include="..\QuickWheel\src\**\*.cs" />
   </ItemGroup>
-  
+
+  <!-- 🆕 将 ModSettingAPI.cs 作为内容文件复制到输出目录 -->
+  <ItemGroup>
+    <Content Include="Integration\ModSettingAPI.cs" Condition="Exists('Integration\ModSettingAPI.cs')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- ✅ 步骤2：恢复核心系统文件 -->
+  <ItemGroup>
+    <!-- 核心系统（已恢复） -->
+    <!-- <Compile Remove="ItemWheelSystem.cs" /> -->
+    <!-- <Compile Remove="ItemWheelContextualAdapter.cs" /> -->
+    <!-- <Compile Remove="ItemWheelAdapter.cs" /> -->
+    <!-- <Compile Remove="WheelMappingPersistence.cs" /> -->
+    <!-- <Compile Remove="ConditionHintManager.cs" /> -->
+    <!-- <Compile Remove="WheelItemWithDecor.cs" /> -->
+    <!-- <Compile Remove="BubbleNotifier.cs" /> -->
+    <!-- <Compile Remove="RarityColorProvider.cs" /> -->
+
+    <!-- 子弹轮盘（步骤5恢复） ✅ 已恢复 -->
+    <!-- <Compile Remove="AmmoWheelSystem.cs" /> -->
+    <!-- <Compile Remove="BulletWheelAdapter.cs" /> -->
+    <!-- <Compile Remove="AmmoWheelIntegration.cs" /> -->
+  </ItemGroup>
+
   <!-- 入口类：ModBehaviour（保持默认编译） -->
 
   <ItemGroup Condition="'$(DuckovPath)' != ''">

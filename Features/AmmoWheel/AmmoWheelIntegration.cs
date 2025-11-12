@@ -2,6 +2,7 @@ using System;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using ItemWheel.Integration;
 
 namespace ItemWheel
 {
@@ -27,6 +28,11 @@ namespace ItemWheel
         [HarmonyPrefix]
         private static bool OnReloadInput_Prefix(InputAction.CallbackContext context)
         {
+            if (!ModSettingFacade.Settings.EnableAmmoWheel)
+            {
+                return true;
+            }
+
             try
             {
                 if (context.started || (context.performed && !context.canceled))
@@ -87,4 +93,3 @@ namespace ItemWheel
         }
     }
 }
-

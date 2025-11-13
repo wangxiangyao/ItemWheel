@@ -174,6 +174,9 @@ namespace ItemWheel
             {
                 _wheel.SetSelectedIndex(preferredIndex);
             }
+
+            // 🆕 启用子弹时间
+            ItemWheelSystem.EnableBulletTime();
         }
 
         private void ConfirmSelectionAndHide()
@@ -198,6 +201,9 @@ namespace ItemWheel
                 SwitchAmmo(item);
             }
             _wheel.Hide();
+
+            // 🆕 禁用子弹时间
+            ItemWheelSystem.DisableBulletTime();
         }
 
         private void OnWheelHidden(int index)
@@ -211,6 +217,8 @@ namespace ItemWheel
 
             if (_slots == null || index < 0 || index >= _slots.Length)
             {
+                // 🆕 禁用子弹时间
+                ItemWheelSystem.DisableBulletTime();
                 return;
             }
             var item = _slots[index];
@@ -219,6 +227,9 @@ namespace ItemWheel
                 SwitchAmmo(item);
             }
             _isClosing = false;
+
+            // 🆕 禁用子弹时间
+            ItemWheelSystem.DisableBulletTime();
         }
 
         private bool RefreshSlots()

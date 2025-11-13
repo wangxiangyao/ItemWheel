@@ -43,7 +43,10 @@ namespace ItemWheel
             try
             {
                 ModSettingFacade.Initialize(this.info);
-                Debug.Log($"[ItemWheel] ModSetting available: {ModSettingFacade.IsModSettingAvailable}");
+
+                // 🆕 配置初始化完成后，重新初始化子弹时间
+                // 因为 ItemWheelSystem 的构造函数在 Awake() 中执行，那时配置还未加载
+                _wheelSystem?.ReinitializeBulletTime();
             }
             catch (Exception ex)
             {

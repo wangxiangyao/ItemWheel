@@ -206,9 +206,34 @@ namespace ItemWheel.Integration
 
                 ModSettingAPI.AddToggle(
                     "ItemWheel_EnableBulletTime",
-                    "子弹时间 (开发中)",
+                    "启用子弹时间（打开轮盘时减速）",
                     GetSavedValue("ItemWheel_EnableBulletTime", _settings.EnableBulletTime),
                     value => _settings.EnableBulletTime = value
+                );
+
+                ModSettingAPI.AddSlider(
+                    "ItemWheel_BulletTimeScale",
+                    "时间流速 (0.1=极慢, 1.0=正常)",
+                    GetSavedValue("ItemWheel_BulletTimeScale", _settings.BulletTimeScale),
+                    new UnityEngine.Vector2(0.1f, 1.0f),
+                    value => _settings.BulletTimeScale = value,
+                    2  // 保留2位小数
+                );
+
+                ModSettingAPI.AddSlider(
+                    "ItemWheel_BulletTimeTransitionSpeed",
+                    "音效过渡速度 (1-10，越大越快)",
+                    GetSavedValue("ItemWheel_BulletTimeTransitionSpeed", _settings.BulletTimeTransitionSpeed),
+                    new UnityEngine.Vector2(1f, 10f),
+                    value => _settings.BulletTimeTransitionSpeed = value,
+                    1  // 保留1位小数
+                );
+
+                ModSettingAPI.AddToggle(
+                    "ItemWheel_BulletTimeAdjustAudioPitch",
+                    "音效变低沉（更有慢动作感）",
+                    GetSavedValue("ItemWheel_BulletTimeAdjustAudioPitch", _settings.BulletTimeAdjustAudioPitch),
+                    value => _settings.BulletTimeAdjustAudioPitch = value
                 );
 
                 Debug.Log("[ItemWheel] ModSetting UI registered successfully");
@@ -269,6 +294,9 @@ namespace ItemWheel.Integration
             _settings.ShowName = GetSavedValue("ItemWheel_ShowName", true);
             _settings.ShowRightText = GetSavedValue("ItemWheel_ShowRightText", true);
             _settings.EnableBulletTime = GetSavedValue("ItemWheel_EnableBulletTime", false);
+            _settings.BulletTimeScale = GetSavedValue("ItemWheel_BulletTimeScale", 0.3f);
+            _settings.BulletTimeTransitionSpeed = GetSavedValue("ItemWheel_BulletTimeTransitionSpeed", 5.0f);
+            _settings.BulletTimeAdjustAudioPitch = GetSavedValue("ItemWheel_BulletTimeAdjustAudioPitch", true);
 
             Debug.Log($"[ItemWheel] Settings loaded from config:\n{_settings}");
         }

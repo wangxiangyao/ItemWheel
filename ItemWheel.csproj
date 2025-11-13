@@ -78,8 +78,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Lib.Harmony" Version="2.4.1" />
+    <PackageReference Include="Lib.Harmony" Version="2.4.1" PrivateAssets="none" />
   </ItemGroup>
+
+  <!-- 🆕 确保 Harmony 的依赖（MonoMod）也被复制到输出目录 -->
+  <Target Name="CopyHarmonyDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <HarmonyDeps Include="$(NuGetPackageRoot)monomod.runtimedetour\**\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(HarmonyDeps)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'@(HarmonyDeps)' != ''" />
+  </Target>
 
   <ItemGroup>
     <Compile Remove="GameSource/**/*.cs" />

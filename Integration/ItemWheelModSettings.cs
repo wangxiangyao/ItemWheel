@@ -77,9 +77,27 @@ namespace ItemWheel.Integration
         // ==================== 特殊功能 ====================
 
         /// <summary>
-        /// 子弹时间（开发中）
+        /// 启用子弹时间效果（打开轮盘时减慢游戏速度）
         /// </summary>
         public bool EnableBulletTime { get; set; } = false;
+
+        /// <summary>
+        /// 子弹时间的速度缩放比例 (0.1 = 10%速度, 1.0 = 正常速度)
+        /// 推荐值: 0.3 (30%速度)
+        /// </summary>
+        public float BulletTimeScale { get; set; } = 0.3f;
+
+        /// <summary>
+        /// 子弹时间过渡速度（数值越大切换越快）
+        /// 推荐值: 5.0
+        /// </summary>
+        public float BulletTimeTransitionSpeed { get; set; } = 5.0f;
+
+        /// <summary>
+        /// 是否根据时间缩放调整音效音调
+        /// 启用后音效会变得低沉，更有"慢动作"感觉
+        /// </summary>
+        public bool BulletTimeAdjustAudioPitch { get; set; } = true;
 
         // ==================== 辅助方法 ====================
 

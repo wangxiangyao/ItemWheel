@@ -12,6 +12,8 @@ using ItemWheel.UI;
 using ItemWheel.Data;
 using ItemWheel.Core;
 using ItemWheel.Integration;
+using ItemWheel.Features.BulletTime;
+using ItemWheel.Features.BulletHUD;
 
 namespace ItemWheel
 {
@@ -60,6 +62,14 @@ namespace ItemWheel
         [System.NonSerialized]
         private Inventory _inventory;
 
+        // 🆕 子弹时间管理器（根据配置启用）
+        [System.NonSerialized]
+        private BulletTimeManager _bulletTimeManager;
+
+        // 🆕 子弹HUD着色器
+        [System.NonSerialized]
+        private BulletHUDColorizer _bulletHUDColorizer;
+
         // 🆕 防止递归事件标志：轮盘拖拽时同步背包，避免触发背包变化事件再次更新轮盘
         private bool _isPerformingSwap = false;
 
@@ -74,6 +84,12 @@ namespace ItemWheel
 
             // 🆕 阶段4：初始化Handler
             InitializeHandlers();
+
+            // 🆕 初始化子弹时间管理器（根据配置）
+            InitializeBulletTime();
+
+            // 🆕 初始化子弹HUD着色器
+            _bulletHUDColorizer = new BulletHUDColorizer();
         }
 
         /// <summary>
@@ -95,6 +111,57 @@ namespace ItemWheel
             _handlers[ItemWheelCategory.Melee] = new Handlers.MeleeHandler(() => _inventory);
 
             Debug.Log("[ItemWheel] Handlers initialized");
+        }
+
+        /// <summary>
+        /// 🆕 初始化子弹时间管理器
+        /// </summary>
+        private void InitializeBulletTime()
+        {
+            var settings = ModSettingFacade.Settings;
+
+            if (settings.EnableBulletTime)
+            {
+                _bulletTimeManager = new BulletTimeManager(
+                    targetTimeScale: settings.BulletTimeScale,
+                    transitionSpeed: settings.BulletTimeTransitionSpeed,
+                    adjustAudioPitch: settings.BulletTimeAdjustAudioPitch
+                );
+
+                Debug.Log($"[ItemWheel] BulletTime initialized - Scale: {settings.BulletTimeScale}x");
+            }
+        }
+
+        /// <summary>
+        /// 🆕 静态方法：启用子弹时间（供外部系统如AmmoWheel调用）
+        /// </summary>
+        public static void EnableBulletTime()
+        {
+            _instance?._bulletTimeManager?.Enable();
+        }
+
+        /// <summary>
+        /// 🆕 静态方法：禁用子弹时间（供外部系统如AmmoWheel调用）
+        /// </summary>
+        public static void DisableBulletTime()
+        {
+            _instance?._bulletTimeManager?.Disable();
+        }
+
+        /// <summary>
+        /// 🆕 重新初始化子弹时间（配置加载后调用）
+        /// </summary>
+        public void ReinitializeBulletTime()
+        {
+            // 清理旧实例
+            if (_bulletTimeManager != null)
+            {
+                _bulletTimeManager.ForceRestore();
+                _bulletTimeManager = null;
+            }
+
+            // 重新初始化
+            InitializeBulletTime();
         }
 
 
@@ -156,6 +223,9 @@ namespace ItemWheel
                 handler.OnWheelShown(wheel);
             }
 
+            // 🆕 启用子弹时间
+            _bulletTimeManager?.Enable();
+
             // 新一轮显示，重置"本次是否交换"标记
             _sessionSwapped[category] = false;
             wheel.Wheel.Show();
@@ -172,6 +242,9 @@ namespace ItemWheel
                 wheel.Input?.SetPressedState(false);  // 重置输入状态
                 wheel.Wheel?.ManualCancel();
             }
+
+            // 🆕 禁用子弹时间
+            _bulletTimeManager?.Disable();
 
             // 兜底：全局清理任意残留的拖拽状态，防止自投/异常导致的拖拽幽灵与 hover 卡住
             try
@@ -434,6 +507,12 @@ namespace ItemWheel
         /// </summary>
         public void Update()
         {
+            // 🆕 更新子弹时间
+            _bulletTimeManager?.Update();
+
+            // 🆕 更新子弹HUD颜色
+            _bulletHUDColorizer?.Update();
+
             // 处理长按计时
             HandleLongPressTimers();
 
@@ -495,6 +574,9 @@ namespace ItemWheel
 
             if (_wheels.TryGetValue(category, out var wheel))
             {
+                // 🆕 关闭轮盘时禁用子弹时间
+                _bulletTimeManager?.Disable();
+
                 // 若本次显示期间发生过交换，关闭时不使用物品，直接取消
                 if (_sessionSwapped.TryGetValue(category, out bool swapped) && swapped)
                 {
@@ -514,6 +596,9 @@ namespace ItemWheel
         /// </summary>
         public void Dispose()
         {
+            // 🆕 强制恢复正常时间（防止退出游戏时时间被锁定）
+            _bulletTimeManager?.ForceRestore();
+
             // 🆕 取消背包监听
             if (_inventory != null)
             {
@@ -666,8 +751,16 @@ namespace ItemWheel
                         // 使用 LastSelectedItem 直接保存的引用
                         Item previouslySelectedItem = affectedWheel.LastSelectedItem;
 
+                        // 🆕 添加边界检查，防止数组越界
+                        string slotItemName = "无效索引";
+                        if (affectedWheel.LastConfirmedIndex >= 0 &&
+                            affectedWheel.LastConfirmedIndex < affectedWheel.Slots.Length)
+                        {
+                            slotItemName = affectedWheel.Slots[affectedWheel.LastConfirmedIndex]?.DisplayName ?? "空";
+                        }
+
                         Debug.Log($"[轮盘] 🔍 背包变化前选中: LastConfirmedIndex={affectedWheel.LastConfirmedIndex}, " +
-                                  $"Slots[{affectedWheel.LastConfirmedIndex}]={affectedWheel.Slots[affectedWheel.LastConfirmedIndex]?.DisplayName}, " +
+                                  $"Slots[{affectedWheel.LastConfirmedIndex}]={slotItemName}, " +
                                   $"LastSelectedItem={previouslySelectedItem?.DisplayName}");
 
                         // 🆕 背包变化时：先刷新槽位（不设置快捷栏），等恢复选中项后再同步快捷栏

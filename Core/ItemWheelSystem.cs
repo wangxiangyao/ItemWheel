@@ -585,7 +585,9 @@ namespace ItemWheel
                 }
                 else
                 {
-                    wheel.Wheel?.ManualConfirm();
+                    // 🆕 修复：松开键盘时应该使用hover的物品，不是ManualConfirm
+                    // ManualConfirm只更新选中，不使用物品（那是点击的行为）
+                    wheel.Wheel?.Hide(executeSelection: true);
                 }
             }
         }

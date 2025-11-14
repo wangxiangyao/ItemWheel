@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using ItemStatsSystem;
+using Duckov;
 
 namespace ItemWheel.Features.BulletHUD
 {
@@ -13,10 +14,21 @@ namespace ItemWheel.Features.BulletHUD
         private Transform _bulletTypeHUDTransform;
         private Image _proceduralImage;
         private int _lastBulletTypeID = -1;
+        private int _lastBulletQuality = -1;
+        private Item _lastBulletItem = null;
+        private object _lastGun = null;
         private bool _isInitialized = false;
+        private int _pendingRecolorFrames = 0;
 
         // HUD 路径：LevelConfig/LevelManager/HUDCanvas/BulletTypeHUD/CurrentBulletType
         private const string HUD_PATH = "LevelConfig/LevelManager/HUDCanvas/BulletTypeHUD/CurrentBulletType";
+        private const int POST_UPDATE_STABILIZE_FRAMES = 8;
+
+        public BulletHUDColorizer()
+        {
+            LevelManager.OnLevelInitialized += HandleLevelInitialized;
+            Canvas.willRenderCanvases += HandleWillRenderCanvases;
+        }
 
         /// <summary>
         /// 每帧更新 - 检测子弹类型变化并更新颜色
@@ -35,24 +47,63 @@ namespace ItemWheel.Features.BulletHUD
             if (gun == null || gun.GunItemSetting == null)
             {
                 // 没有装备枪械，重置状态
-                if (_lastBulletTypeID != -1)
+                if (_lastBulletTypeID != -1 || _lastGun != null)
                 {
                     _lastBulletTypeID = -1;
+                    _lastBulletQuality = -1;
+                    _lastBulletItem = null;
+                    _lastGun = null;
+                    _pendingRecolorFrames = 0;
                     ResetColor();
                 }
                 return;
             }
 
+            bool gunChanged = !ReferenceEquals(_lastGun, gun);
+            if (gunChanged)
+            {
+                _lastGun = gun;
+            }
+
             // 获取当前装填的子弹
             Item currentBullet = gun.GunItemSetting.GetCurrentLoadedBullet();
             int currentTypeID = currentBullet?.TypeID ?? -1;
+            int currentQuality = currentBullet?.Quality ?? -1;
 
-            // 子弹类型发生变化
-            if (currentTypeID != _lastBulletTypeID)
+            bool bulletChanged =
+                currentTypeID != _lastBulletTypeID ||
+                currentQuality != _lastBulletQuality ||
+                !ReferenceEquals(_lastBulletItem, currentBullet);
+
+            if (gunChanged || bulletChanged)
             {
                 _lastBulletTypeID = currentTypeID;
+                _lastBulletQuality = currentQuality;
+                _lastBulletItem = currentBullet;
+                _pendingRecolorFrames = POST_UPDATE_STABILIZE_FRAMES;
                 UpdateColor(currentBullet);
             }
+
+        }
+
+        /// <summary>
+        /// 尝试初始化 UI 元素
+        /// </summary>
+        private void HandleLevelInitialized()
+        {
+            if (_isInitialized)
+            {
+                ResetColor();
+            }
+
+            _isInitialized = false;
+            _bulletTypeHUDTransform = null;
+            _proceduralImage = null;
+            _lastBulletTypeID = -1;
+            _lastBulletQuality = -1;
+            _lastBulletItem = null;
+            _lastGun = null;
+            _pendingRecolorFrames = 0;
         }
 
         /// <summary>
@@ -73,6 +124,7 @@ namespace ItemWheel.Features.BulletHUD
                     {
                         _isInitialized = true;
                         Debug.Log($"[BulletHUDColorizer] 初始化成功（直接路径）");
+                        SyncCurrentBulletState(true);
                         return;
                     }
                 }
@@ -94,6 +146,7 @@ namespace ItemWheel.Features.BulletHUD
                             {
                                 _isInitialized = true;
                                 Debug.Log($"[BulletHUDColorizer] 初始化成功（递归查找），完整路径: {GetFullPath(obj.transform)}");
+                                SyncCurrentBulletState(true);
                                 return;
                             }
                         }
@@ -131,10 +184,40 @@ namespace ItemWheel.Features.BulletHUD
             return path;
         }
 
+        private void SyncCurrentBulletState(bool paintImmediately)
+        {
+            var gun = CharacterMainControl.Main?.GetGun();
+            if (gun == null || gun.GunItemSetting == null)
+            {
+                _lastGun = null;
+                _lastBulletItem = null;
+                _lastBulletTypeID = -1;
+                _lastBulletQuality = -1;
+                _pendingRecolorFrames = 0;
+                if (paintImmediately)
+                {
+                    ResetColor();
+                }
+                return;
+            }
+
+            _lastGun = gun;
+            Item currentBullet = gun.GunItemSetting.GetCurrentLoadedBullet();
+            _lastBulletTypeID = currentBullet?.TypeID ?? -1;
+            _lastBulletQuality = currentBullet?.Quality ?? -1;
+            _lastBulletItem = currentBullet;
+
+            if (paintImmediately)
+            {
+                _pendingRecolorFrames = POST_UPDATE_STABILIZE_FRAMES;
+                UpdateColor(currentBullet);
+            }
+        }
+
         /// <summary>
         /// 根据子弹品质更新颜色
         /// </summary>
-        private void UpdateColor(Item bullet)
+        private void UpdateColor(Item bullet, bool logChange = true)
         {
             if (_proceduralImage == null) return;
 
@@ -155,7 +238,10 @@ namespace ItemWheel.Features.BulletHUD
                 // 设置 Image 颜色
                 _proceduralImage.color = tintColor;
 
-                Debug.Log($"[BulletHUDColorizer] 更新子弹HUD颜色: {bullet.DisplayName} (Q{quality}) -> {tintColor}");
+                if (logChange)
+                {
+                    Debug.Log($"[BulletHUDColorizer] 更新子弹HUD颜色: {bullet.DisplayName} (Q{quality}) -> {tintColor}");
+                }
             }
             catch (System.Exception ex)
             {
@@ -180,12 +266,46 @@ namespace ItemWheel.Features.BulletHUD
             }
         }
 
+        private void HandleWillRenderCanvases()
+        {
+            if (_pendingRecolorFrames <= 0)
+            {
+                return;
+            }
+
+            if (!_isInitialized || _proceduralImage == null)
+            {
+                _pendingRecolorFrames = 0;
+                return;
+            }
+
+            _pendingRecolorFrames--;
+
+            Item bullet = _lastBulletItem;
+            var gun = CharacterMainControl.Main?.GetGun();
+            if (gun != null && gun.GunItemSetting != null)
+            {
+                bullet = gun.GunItemSetting.GetCurrentLoadedBullet();
+            }
+
+            UpdateColor(bullet, logChange: false);
+        }
+
         /// <summary>
         /// 强制刷新颜色（用于手动触发）
         /// </summary>
         public void ForceRefresh()
         {
             _lastBulletTypeID = -1; // 重置状态，强制下次更新
+            _lastBulletQuality = -1;
+            _lastBulletItem = null;
+            _pendingRecolorFrames = POST_UPDATE_STABILIZE_FRAMES;
+        }
+
+        public void Dispose()
+        {
+            LevelManager.OnLevelInitialized -= HandleLevelInitialized;
+            Canvas.willRenderCanvases -= HandleWillRenderCanvases;
         }
     }
 }

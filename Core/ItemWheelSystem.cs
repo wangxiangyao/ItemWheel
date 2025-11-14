@@ -601,6 +601,9 @@ namespace ItemWheel
             // 🆕 强制恢复正常时间（防止退出游戏时时间被锁定）
             _bulletTimeManager?.ForceRestore();
 
+            // 🆕 释放子弹HUD着色器
+            _bulletHUDColorizer?.Dispose();
+
             // 🆕 取消背包监听
             if (_inventory != null)
             {

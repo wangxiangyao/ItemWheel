@@ -118,8 +118,8 @@ namespace ItemWheel
                     cfg.GridSpacing = 12f;
                     cfg.DeadZoneRadius = 40f; // 死区半径（像素）
 
-                    // 🆕 禁用点击选择（子弹轮盘点击无实际效果，容易误操作）
-                    cfg.EnableClickSelect = false;
+                    // 🆕 启用点击选择（点击和hover松开都能换弹）
+                    cfg.EnableClickSelect = true;
 
                     // 🆕 使用 WheelSpriteLoader 加载的自定义格子Sprite
                     cfg.SlotNormalSprite = WheelSpriteLoader.SlotNormal;
@@ -208,8 +208,11 @@ namespace ItemWheel
 
         private void OnWheelHidden(int index)
         {
+            Debug.Log($"[AmmoWheel] 🔵 OnWheelHidden called: index={index}, _skipOnHidden={_skipOnHidden}, _isClosing={_isClosing}");
+
             if (_skipOnHidden)
             {
+                Debug.Log($"[AmmoWheel] ⏭️ OnWheelHidden skipped (_skipOnHidden=true)");
                 _skipOnHidden = false;
                 _isClosing = false;
                 return;
@@ -217,18 +220,28 @@ namespace ItemWheel
 
             if (_slots == null || index < 0 || index >= _slots.Length)
             {
+                Debug.LogWarning($"[AmmoWheel] ❌ OnWheelHidden: Invalid index or slots. _slots={_slots != null}, index={index}, length={_slots?.Length}");
                 // 🆕 禁用子弹时间
                 ItemWheelSystem.DisableBulletTime();
                 return;
             }
             var item = _slots[index];
+            Debug.Log($"[AmmoWheel] 🔵 OnWheelHidden: item at index {index} = {item?.DisplayName ?? "null"}");
+
             if (item != null)
             {
+                Debug.Log($"[AmmoWheel] 🔫 Switching ammo to: {item.DisplayName}");
                 SwitchAmmo(item);
             }
+            else
+            {
+                Debug.LogWarning($"[AmmoWheel] ❌ Item is null at index {index}");
+            }
+
             _isClosing = false;
 
             // 🆕 禁用子弹时间
+            Debug.Log($"[AmmoWheel] ⏱️ Disabling bullet time");
             ItemWheelSystem.DisableBulletTime();
         }
 

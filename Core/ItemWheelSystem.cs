@@ -763,6 +763,13 @@ namespace ItemWheel
                 {
                     Debug.Log($"[轮盘] 🎯 背包变化: slot={changedSlot}, 物品: {changedItem.DisplayName}, 类别={affectedCategory.Value}");
 
+                    // 🆕 检查该轮盘是否被禁用，如果禁用则跳过处理
+                    if (!ModSettingFacade.Settings.IsWheelEnabled(affectedCategory.Value))
+                    {
+                        Debug.Log($"[轮盘] ⏭️ 轮盘已禁用，跳过处理: {affectedCategory.Value}");
+                        return;
+                    }
+
                     if (_wheels.TryGetValue(affectedCategory.Value, out CategoryWheel affectedWheel))
                     {
                         // 🆕 修复：从 Slots 获取选中项可能不准确（背包变化后 Slots 引用可能错位）

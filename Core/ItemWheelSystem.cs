@@ -1649,8 +1649,18 @@ namespace ItemWheel
                 return;
             }
 
-            // 🗑️ 拖拽验证已在 CanDragSlotImpl + OnBeginDrag 阶段完成，此处不再需要检查
-            // 如果执行到这里，说明拖拽已通过验证（只有主背包顶层单物品）
+            // 🆕 双重验证：检查两个槽位是否都可以拖拽
+            // 虽然 CanDragSlot 已经阻止了拖拽开始，但强行 drop 仍可能触发交换事件
+            var (canDragFrom, reasonFrom) = CanDragSlotImpl(wheel, fromWheelPos);
+            var (canDragTo, reasonTo) = CanDragSlotImpl(wheel, toWheelPos);
+
+            if (!canDragFrom || !canDragTo)
+            {
+                Debug.Log($"[轮盘] ✗ 阻止非法交换: from={fromWheelPos}({reasonFrom}), to={toWheelPos}({reasonTo})");
+                // 刷新轮盘显示，恢复正确的顺序
+                RefreshCategorySlots(wheel, resetSelection: false);
+                return;
+            }
 
             if (wheel.WheelToBackpackMapping == null || wheel.BackpackToWheelMapping == null)
             {

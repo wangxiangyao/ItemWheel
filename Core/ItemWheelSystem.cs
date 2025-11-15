@@ -73,6 +73,16 @@ namespace ItemWheel
         // 🆕 防止递归事件标志：轮盘拖拽时同步背包，避免触发背包变化事件再次更新轮盘
         private bool _isPerformingSwap = false;
 
+        // 🆕 待定消失的物品（延迟判断机制，避免拖拽时误判为消失）
+        private class PendingDisappearance
+        {
+            public ItemWheelCategory Category;
+            public Item Item;
+            public int FrameCount;
+            public const int MAX_WAIT_FRAMES = 5; // 等待5帧（约0.08秒）
+        }
+        private List<PendingDisappearance> _pendingDisappearances = new List<PendingDisappearance>();
+
         public ItemWheelSystem()
         {
             _instance = this;
@@ -513,6 +523,9 @@ namespace ItemWheel
             // 🆕 更新子弹HUD颜色
             _bulletHUDColorizer?.Update();
 
+            // 🆕 处理待定消失的物品
+            ProcessPendingDisappearances();
+
             // 处理长按计时
             HandleLongPressTimers();
 
@@ -777,28 +790,49 @@ namespace ItemWheel
                             int restoredIndex = FindItemIndexInSlots(affectedWheel.Slots, previouslySelectedItem);
                             if (restoredIndex >= 0)
                             {
+                                // 物品找到了，恢复选中
                                 affectedWheel.LastConfirmedIndex = restoredIndex;
                                 affectedWheel.LastSelectedItem = previouslySelectedItem;  // 保持引用
                                 Debug.Log($"[轮盘] ✅ 恢复选中项: {previouslySelectedItem.DisplayName}, 位置: {restoredIndex}");
+
+                                // 恢复选中后，同步快捷栏
+                                if (affectedWheel.Category != ItemWheelCategory.Melee)
+                                {
+                                    var shortcutIndex = (int)affectedWheel.Category;
+                                    Duckov.ItemShortcut.Set(shortcutIndex, previouslySelectedItem);
+                                    Debug.Log($"[轮盘] 🔄 重新同步快捷栏: 类别={affectedWheel.Category}, 物品={previouslySelectedItem.DisplayName}");
+                                }
                             }
                             else
                             {
-                                // 物品不存在了（如容器物品被使用），选择下一个可用物品
-                                affectedWheel.LastConfirmedIndex = GetFirstAvailableItemIndex(affectedWheel);
-                                if (affectedWheel.LastConfirmedIndex >= 0)
-                                {
-                                    affectedWheel.LastSelectedItem = affectedWheel.Slots[affectedWheel.LastConfirmedIndex];
-                                }
-                                Debug.Log($"[轮盘] ⚠️ 选中的物品已消失: {previouslySelectedItem.DisplayName}, 自动选择下一个: 位置={affectedWheel.LastConfirmedIndex}");
-                            }
+                                // 物品找不到了，检查是暂时找不到还是真的离开了
+                                bool stillInValidLocation = IsItemStillInValidLocation(previouslySelectedItem);
 
-                            // 🆕 修复：恢复选中项后，重新同步快捷栏（确保快捷栏和轮盘选中一致）
-                            if (affectedWheel.Category != ItemWheelCategory.Melee && affectedWheel.LastConfirmedIndex >= 0)
-                            {
-                                var shortcutIndex = (int)affectedWheel.Category;
-                                var newItem = affectedWheel.Slots[affectedWheel.LastConfirmedIndex];
-                                Duckov.ItemShortcut.Set(shortcutIndex, newItem);
-                                Debug.Log($"[轮盘] 🔄 重新同步快捷栏: 类别={affectedWheel.Category}, 物品={newItem?.DisplayName}");
+                                if (stillInValidLocation)
+                                {
+                                    // 物品还在合法位置（主背包/容器/宠物背包），但暂时找不到
+                                    // 可能正在拖拽或整理，保持 LastSelectedItem 不变，不更新快捷键
+                                    Debug.Log($"[轮盘] ⏸️ 物品暂时找不到（正在移动）: {previouslySelectedItem.DisplayName}，保持选中不变");
+                                }
+                                else
+                                {
+                                    // 物品离开了合法位置，但可能是正在被拖拽
+                                    // 🆕 添加到待定列表，延迟几帧再判断是否真的消失
+                                    var existing = _pendingDisappearances.Find(p =>
+                                        p.Category == affectedWheel.Category &&
+                                        ReferenceEquals(p.Item, previouslySelectedItem));
+
+                                    if (existing == null)
+                                    {
+                                        _pendingDisappearances.Add(new PendingDisappearance
+                                        {
+                                            Category = affectedWheel.Category,
+                                            Item = previouslySelectedItem,
+                                            FrameCount = 0
+                                        });
+                                        Debug.Log($"[轮盘] ⏳ 物品标记为待定消失: {previouslySelectedItem.DisplayName}，等待{PendingDisappearance.MAX_WAIT_FRAMES}帧确认");
+                                    }
+                                }
                             }
                         }
                     }
@@ -821,6 +855,167 @@ namespace ItemWheel
             foreach (var kvp in _wheels)
             {
                 RefreshCategorySlots(kvp.Value, resetSelection: false, skipShortcutSync: true);
+            }
+        }
+
+        /// <summary>
+        /// 🆕 检查物品是否还在合法的搜索范围内（根据设置）
+        /// 用于判断物品是暂时找不到（拖拽/整理中）还是真的离开了
+        /// </summary>
+        private bool IsItemStillInValidLocation(Item item)
+        {
+            if (item == null) return false;
+
+            var settings = ModSettingFacade.Settings;
+
+            // 1. 检查是否在主背包中
+            if (item.InInventory == _inventory)
+            {
+                return true;
+            }
+
+            // 2. 检查是否在主背包的容器中（如果设置允许）
+            if (settings.SearchInSlots && _inventory != null && _inventory.Content != null)
+            {
+                foreach (var containerItem in _inventory.Content)
+                {
+                    if (containerItem != null && containerItem.Inventory != null)
+                    {
+                        if (item.InInventory == containerItem.Inventory)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // 3. 检查是否在宠物背包中（如果设置允许）
+            if (settings.SearchInPetInventory)
+            {
+                var petInventory = PetProxy.PetInventory;
+                if (petInventory != null)
+                {
+                    // 检查是否在宠物背包顶层
+                    if (item.InInventory == petInventory)
+                    {
+                        return true;
+                    }
+
+                    // 检查是否在宠物背包的容器中（如果设置允许）
+                    if (settings.SearchInSlots && petInventory.Content != null)
+                    {
+                        foreach (var containerItem in petInventory.Content)
+                        {
+                            if (containerItem != null && containerItem.Inventory != null)
+                            {
+                                if (item.InInventory == containerItem.Inventory)
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 🆕 处理待定消失的物品（延迟判断机制）
+        /// 每帧检查待定列表，如果物品重新出现就恢复选中，如果超时就切换到其他物品
+        /// </summary>
+        private void ProcessPendingDisappearances()
+        {
+            if (_pendingDisappearances.Count == 0) return;
+
+            for (int i = _pendingDisappearances.Count - 1; i >= 0; i--)
+            {
+                var pending = _pendingDisappearances[i];
+                pending.FrameCount++;
+
+                // 尝试在轮盘中找到该物品
+                if (_wheels.TryGetValue(pending.Category, out var wheel))
+                {
+                    int foundIndex = FindItemIndexInSlots(wheel.Slots, pending.Item);
+
+                    if (foundIndex >= 0)
+                    {
+                        // 物品重新出现了！恢复选中
+                        wheel.LastConfirmedIndex = foundIndex;
+                        wheel.LastSelectedItem = pending.Item;
+                        Debug.Log($"[轮盘] ✅ 待定物品重新出现: {pending.Item.DisplayName}, 位置: {foundIndex}");
+
+                        // 同步快捷栏
+                        if (wheel.Category != ItemWheelCategory.Melee)
+                        {
+                            var shortcutIndex = (int)wheel.Category;
+                            Duckov.ItemShortcut.Set(shortcutIndex, pending.Item);
+                            Debug.Log($"[轮盘] 🔄 重新同步快捷栏: 类别={wheel.Category}, 物品={pending.Item.DisplayName}");
+                        }
+
+                        // 移除待定项
+                        _pendingDisappearances.RemoveAt(i);
+                    }
+                    else if (pending.FrameCount >= PendingDisappearance.MAX_WAIT_FRAMES)
+                    {
+                        // 超时了，确认物品真的消失了
+                        wheel.LastConfirmedIndex = GetFirstAvailableItemIndex(wheel);
+                        if (wheel.LastConfirmedIndex >= 0)
+                        {
+                            wheel.LastSelectedItem = wheel.Slots[wheel.LastConfirmedIndex];
+                            Debug.Log($"[轮盘] ⚠️ 确认物品消失: {pending.Item.DisplayName}，自动选择下一个: {wheel.LastSelectedItem?.DisplayName}");
+
+                            // 同步快捷栏
+                            if (wheel.Category != ItemWheelCategory.Melee)
+                            {
+                                var shortcutIndex = (int)wheel.Category;
+                                Duckov.ItemShortcut.Set(shortcutIndex, wheel.LastSelectedItem);
+                                Debug.Log($"[轮盘] 🔄 重新同步快捷栏: 类别={wheel.Category}, 物品={wheel.LastSelectedItem?.DisplayName}");
+                            }
+                        }
+                        else
+                        {
+                            // 没有可用物品了
+                            wheel.LastSelectedItem = null;
+                            Debug.Log($"[轮盘] ❌ 没有可用物品了");
+                        }
+
+                        // 移除待定项
+                        _pendingDisappearances.RemoveAt(i);
+                    }
+                    // 否则继续等待
+                }
+                else
+                {
+                    // 类别不存在了，移除待定项
+                    _pendingDisappearances.RemoveAt(i);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 手动触发 Inventory 的 onContentChanged 事件（使用反射）
+        /// </summary>
+        private void TriggerInventoryContentChanged(Inventory inventory, int position)
+        {
+            try
+            {
+                // 使用反射获取事件字段
+                var eventField = typeof(Inventory).GetField("onContentChanged",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Public);
+
+                if (eventField != null)
+                {
+                    var eventDelegate = eventField.GetValue(inventory) as System.Action<Inventory, int>;
+                    eventDelegate?.Invoke(inventory, position);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[轮盘] 触发 onContentChanged 事件失败: {ex.Message}");
             }
         }
 
@@ -1690,13 +1885,17 @@ namespace ItemWheel
 
             try
             {
-                // 从背包中取出两个物品
-                item.Detach();
-                targetItem.Detach();
+                // 直接交换 Content 数组中的索引（避免 Detach 导致 InInventory 为 null）
+                var temp = _inventory.Content[fromBackpackPos];
+                _inventory.Content[fromBackpackPos] = _inventory.Content[toBackpackPos];
+                _inventory.Content[toBackpackPos] = temp;
 
-                // 交换位置重新放入
-                _inventory.AddAt(targetItem, fromBackpackPos);
-                _inventory.AddAt(item, toBackpackPos);
+                // 手动触发变更事件（重要！否则UI和其他监听器不会更新）
+                TriggerInventoryContentChanged(_inventory, fromBackpackPos);
+                TriggerInventoryContentChanged(_inventory, toBackpackPos);
+
+                // 重新计算重量（保持一致性）
+                _inventory.RecalculateWeight();
 
                 // 更新映射关系（双向交换）
                 wheel.WheelToBackpackMapping[fromWheelPos] = toBackpackPos;

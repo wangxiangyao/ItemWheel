@@ -134,11 +134,27 @@ namespace ItemWheel
                     };
                 })
                 .WithAdapter(new BulletWheelAdapter(_bulletTypeCounts))
+
                 .WithView(_view)
+
                 .WithInput(_input)
+
                 .WithSelectionStrategy(new GridSelectionStrategy())
+
                 .OnItemSelected((index, item) => OnItemSelected(index, item))
-                .OnWheelHidden(index => OnWheelHidden(index))
+
+                .OnWheelShown(WheelInputGuard.OnWheelShown)
+
+                .OnWheelHidden(index =>
+
+                {
+
+                    WheelInputGuard.OnWheelHidden();
+
+                    OnWheelHidden(index);
+
+                })
+
                 .Build();
 
             _slots = new Item[WheelConfig.SLOT_COUNT];

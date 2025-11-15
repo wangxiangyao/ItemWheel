@@ -629,6 +629,7 @@ namespace ItemWheel
                 // Input处理器由Wheel管理，不需要单独释放
             }
 
+            WheelInputGuard.Reset();
             _wheels.Clear();
 
             // 清除单例引用
@@ -1108,11 +1109,27 @@ namespace ItemWheel
                     };
                 })
                 .WithAdapter(adapter)
-                .WithView(view)  // ⭐ 使用创建的View实例
-                .WithInput(input)  // ✨ 只处理鼠标移动，不处理按键
+
+                .WithView(view)  // ? ?????View??
+
+                .WithInput(input)  // ? ?????????????
+
                 .WithSelectionStrategy(new GridSelectionStrategy())
+
                 .OnItemSelected((index, item) => OnItemSelected(context, index, item))
-                .OnWheelHidden(index => OnWheelHidden(context, index))
+
+                .OnWheelShown(WheelInputGuard.OnWheelShown)
+
+                .OnWheelHidden(index =>
+
+                {
+
+                    WheelInputGuard.OnWheelHidden();
+
+                    OnWheelHidden(context, index);
+
+                })
+
                 .Build();
 
             context.Wheel = wheel;

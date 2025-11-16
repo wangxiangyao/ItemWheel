@@ -862,7 +862,49 @@ namespace ItemWheel
             Debug.Log($"[轮盘] ⚠️ 物品为null，刷新所有类别但保持选中");
             foreach (var kvp in _wheels)
             {
-                RefreshCategorySlots(kvp.Value, resetSelection: false, skipShortcutSync: true);
+                var wheel = kvp.Value;
+                var previouslySelectedItem = wheel.LastSelectedItem;
+
+                // 刷新槽位
+                RefreshCategorySlots(wheel, resetSelection: false, skipShortcutSync: true);
+
+                // 🆕 尝试恢复选中项（重要！避免索引错位）
+                if (previouslySelectedItem != null)
+                {
+                    int restoredIndex = FindItemIndexInSlots(wheel.Slots, previouslySelectedItem);
+                    if (restoredIndex >= 0)
+                    {
+                        // 物品找到了，更新索引
+                        wheel.LastConfirmedIndex = restoredIndex;
+                        Debug.Log($"[轮盘] ✅ 恢复选中项: {previouslySelectedItem.DisplayName}, 类别={wheel.Category}, 位置: {restoredIndex}");
+                    }
+                    else
+                    {
+                        // 物品找不到，可能正在移动中（拖拽到容器/宠物背包）
+                        // 🆕 添加到待定列表，延迟几帧再判断是否真的消失
+                        var existing = _pendingDisappearances.Find(p =>
+                            p.Category == wheel.Category &&
+                            ReferenceEquals(p.Item, previouslySelectedItem));
+
+                        if (existing == null)
+                        {
+                            _pendingDisappearances.Add(new PendingDisappearance
+                            {
+                                Category = wheel.Category,
+                                Item = previouslySelectedItem,
+                                FrameCount = 0
+                            });
+                            Debug.Log($"[轮盘] ⏳ 选中项未找到，标记为待定: {previouslySelectedItem.DisplayName}, 类别={wheel.Category}, 等待{PendingDisappearance.MAX_WAIT_FRAMES}帧");
+                        }
+                        else
+                        {
+                            Debug.Log($"[轮盘] ⏳ 选中项已在待定列表: {previouslySelectedItem.DisplayName}, 类别={wheel.Category}, 帧数={existing.FrameCount}");
+                        }
+
+                        // 暂时清除索引（避免显示错误的物品），等待 ProcessPendingDisappearances 恢复
+                        wheel.LastConfirmedIndex = -1;
+                    }
+                }
             }
         }
 
@@ -945,6 +987,9 @@ namespace ItemWheel
                 // 尝试在轮盘中找到该物品
                 if (_wheels.TryGetValue(pending.Category, out var wheel))
                 {
+                    // 🆕 重新刷新轮盘槽位（重要！否则找不到移动后的物品）
+                    RefreshCategorySlots(wheel, resetSelection: false, skipShortcutSync: true);
+
                     int foundIndex = FindItemIndexInSlots(wheel.Slots, pending.Item);
 
                     if (foundIndex >= 0)

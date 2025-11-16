@@ -95,20 +95,30 @@ namespace ItemWheel
                     {
                         try
                         {
+                            Debug.Log($"[InventorySearcher] 🔍 搜索容器: {item.DisplayName}, 插槽数={item.Slots.Count}, 背包={inventory.DisplayName}");
+
                             // 🆕 使用 for 循环记录槽位索引
                             for (int slotIndex = 0; slotIndex < item.Slots.Count; slotIndex++)
                             {
                                 var slot = item.Slots[slotIndex];
                                 if (slot?.Content == null)
+                                {
+                                    Debug.Log($"[InventorySearcher]   插槽[{slotIndex}]: 空");
                                     continue;
+                                }
 
                                 var slotItem = slot.Content;
+                                bool matched = matchPredicate(slotItem);
+                                bool alreadyAdded = addedItems.Contains(slotItem);
 
-                                if (matchPredicate(slotItem) && !addedItems.Contains(slotItem))
+                                Debug.Log($"[InventorySearcher]   插槽[{slotIndex}]: {slotItem.DisplayName}, 匹配={matched}, 已添加={alreadyAdded}");
+
+                                if (matched && !alreadyAdded)
                                 {
                                     // 传递正确的 slotIndex
                                     results.Add(new SearchResult(slotItem, backpackIndex, inventory, true, isPetInventory, slotIndex));
                                     addedItems.Add(slotItem);
+                                    Debug.Log($"[InventorySearcher]   ✅ 添加到结果: {slotItem.DisplayName}");
                                 }
                             }
                         }

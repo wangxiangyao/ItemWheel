@@ -5,6 +5,7 @@ using Duckov.Modding;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using ItemWheel.Integration;
+using ItemWheel.Integration.Compatibility;
 using ItemWheel.Utils;
 
 namespace ItemWheel
@@ -31,6 +32,8 @@ namespace ItemWheel
 
             _harmony = new Harmony("com.duckov.itemwheel");
             _harmony.PatchAll(typeof(ModBehaviour).Assembly);
+
+            CompatibilityBootstrap.Initialize();
         }
 
         /// <summary>

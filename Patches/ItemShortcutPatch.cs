@@ -118,6 +118,11 @@ namespace ItemWheel.Patches
                 {
                     isValid = true;
                 }
+                // 5. 插在任意槽位（例如 CashSlot 的自定义槽）
+                else if (item.PluggedIntoSlot != null)
+                {
+                    isValid = true;
+                }
 
                 __result = isValid;
                 return false; // 跳过原方法，使用我们的结果

@@ -1856,6 +1856,7 @@ namespace ItemWheel
             // 🆕 其他类别统一使用 ItemCollector
             return ItemCollector.Collect(
                 _inventory,
+                _character,
                 category,
                 item => MatchesCategoryStatic(item, category),
                 ModSettingFacade.Settings,

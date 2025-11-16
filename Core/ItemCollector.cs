@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ItemStatsSystem;
+using ItemWheel.Core.ItemSources;
 using ItemWheel.Data;
 using ItemWheel.Integration;
 using UnityEngine;
@@ -26,6 +27,7 @@ namespace ItemWheel.Core
         /// <returns>收集到的所有物品列表（无数量限制）</returns>
         public static List<CollectedItemInfo> Collect(
             Inventory mainInventory,
+            CharacterMainControl character,
             ItemWheelSystem.ItemWheelCategory category,
             Func<Item, bool> matchPredicate,
             ItemWheelModSettings settings,
@@ -39,11 +41,11 @@ namespace ItemWheel.Core
             // 根据是否堆叠选择收集方式
             if (enableStacking)
             {
-                return CollectWithStacking(mainInventory, matchPredicate, settings);
+                return CollectWithStacking(mainInventory, matchPredicate, settings, character);
             }
             else
             {
-                return CollectNormal(mainInventory, matchPredicate, settings);
+                return CollectNormal(mainInventory, matchPredicate, settings, character);
             }
         }
 
@@ -54,7 +56,8 @@ namespace ItemWheel.Core
         private static List<CollectedItemInfo> CollectWithStacking(
             Inventory mainInventory,
             Func<Item, bool> matchPredicate,
-            ItemWheelModSettings settings)
+            ItemWheelModSettings settings,
+            CharacterMainControl character)
         {
             var result = new List<CollectedItemInfo>();
             var addedItems = new HashSet<Item>();
@@ -68,11 +71,13 @@ namespace ItemWheel.Core
             Debug.Log($"[ItemCollector] 堆叠搜索 - 背包数量: {inventories.Count}, 搜索容器: {settings.SearchInSlots}, 搜索宠物: {settings.SearchInPetInventory}");
 
             // 2. 搜索所有背包
-            var searchResults = InventorySearcher.SearchAll(
+            var options = new InventorySearchOptions(
                 inventories,
                 matchPredicate,
-                settings.SearchInSlots
+                settings,
+                character
             );
+            var searchResults = InventorySearcher.SearchAll(options);
 
             Debug.Log($"[ItemCollector] 找到 {searchResults.Count} 个物品（堆叠前）");
 
@@ -132,7 +137,8 @@ namespace ItemWheel.Core
         private static List<CollectedItemInfo> CollectNormal(
             Inventory mainInventory,
             Func<Item, bool> matchPredicate,
-            ItemWheelModSettings settings)
+            ItemWheelModSettings settings,
+            CharacterMainControl character)
         {
             var result = new List<CollectedItemInfo>();
             var addedItems = new HashSet<Item>();
@@ -146,11 +152,13 @@ namespace ItemWheel.Core
             Debug.Log($"[ItemCollector] 普通搜索 - 背包数量: {inventories.Count}, 搜索容器: {settings.SearchInSlots}, 搜索宠物: {settings.SearchInPetInventory}");
 
             // 2. 搜索所有背包
-            var searchResults = InventorySearcher.SearchAll(
+            var options = new InventorySearchOptions(
                 inventories,
                 matchPredicate,
-                settings.SearchInSlots
+                settings,
+                character
             );
+            var searchResults = InventorySearcher.SearchAll(options);
 
             Debug.Log($"[ItemCollector] 找到 {searchResults.Count} 个物品");
 
@@ -180,7 +188,7 @@ namespace ItemWheel.Core
             Func<Item, bool> matchPredicate,
             ItemWheelModSettings settings)
         {
-            var result = CollectNormal(mainInventory, matchPredicate, settings);
+            var result = CollectNormal(mainInventory, matchPredicate, settings, character);
             var addedItems = new HashSet<Item>(result.Select(r => r.Item));
 
             // 近战槽中的武器也纳入候选

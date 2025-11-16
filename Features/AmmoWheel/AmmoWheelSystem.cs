@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Duckov;
 using ItemStatsSystem;
 using QuickWheel.Core;
 using QuickWheel.Selection;
@@ -9,6 +10,7 @@ using UnityEngine;
 using QuickWheel.Utils;
 using ItemWheel.UI;
 using ItemWheel.Integration;
+using ItemWheel.Core.ItemSources;
 
 namespace ItemWheel
 {
@@ -273,14 +275,22 @@ namespace ItemWheel
                 return false;
             }
 
-            // 仅收集与当前枪口径匹配的子弹类型
-            var dict = gun.GunItemSetting.GetBulletTypesInInventory(inventory);
-            _bulletTypeCounts.Clear();
-            foreach (var kv in dict)
+            var inventories = InventorySearcher.GetInventoriesToSearch(
+                inventory,
+                ModSettingFacade.Settings.SearchInPetInventory);
+            if (inventories.Count == 0)
             {
-                _bulletTypeCounts[kv.Key] = kv.Value.count;
+                return false;
             }
-            if (dict == null || dict.Count == 0)
+
+            var combinedTypes = CollectBulletCounts(gun, inventories);
+            _bulletTypeCounts.Clear();
+            foreach (var kv in combinedTypes)
+            {
+                _bulletTypeCounts[kv.Key] = kv.Value;
+            }
+
+            if (combinedTypes.Count == 0)
             {
                 _slots = new Item[WheelConfig.SLOT_COUNT];
                 _wheel.SetSlots(_slots);
@@ -288,10 +298,10 @@ namespace ItemWheel
             }
 
             var list = new List<Item>();
-            foreach (var kv in dict)
+            foreach (var kv in combinedTypes)
             {
                 int typeId = kv.Key;
-                var rep = FindFirstItemOfType(inventory, typeId);
+                var rep = FindFirstItemOfType(inventories, typeId);
                 if (rep != null)
                 {
                     _typeToItem[typeId] = rep;
@@ -312,16 +322,55 @@ namespace ItemWheel
             return true;
         }
 
-        private static Item FindFirstItemOfType(Inventory inv, int typeId)
+        private static Item FindFirstItemOfType(IEnumerable<Inventory> inventories, int typeId)
         {
-            foreach (var item in inv)
+            var options = new InventorySearchOptions(
+                inventories,
+                item => item != null && item.TypeID == typeId,
+                ModSettingFacade.Settings,
+                CharacterMainControl.Main);
+            return InventorySearcher.FindFirst(options)?.Item;
+        }
+
+        private static Dictionary<int, int> CollectBulletCounts(ItemAgent_Gun gun, IEnumerable<Inventory> inventories)
+        {
+            var combined = new Dictionary<int, int>();
+            foreach (var inv in inventories)
             {
-                if (item != null && item.TypeID == typeId)
+                if (inv == null)
                 {
-                    return item;
+                    continue;
+                }
+                try
+                {
+                    var types = gun.GunItemSetting.GetBulletTypesInInventory(inv);
+                    if (types == null)
+                    {
+                        continue;
+                    }
+                    foreach (var kv in types)
+                    {
+                        int count = kv.Value?.count ?? 0;
+                        if (count <= 0)
+                        {
+                            continue;
+                        }
+                        if (combined.TryGetValue(kv.Key, out var existing))
+                        {
+                            combined[kv.Key] = existing + count;
+                        }
+                        else
+                        {
+                            combined[kv.Key] = count;
+                        }
+                    }
+                }
+                catch
+                {
+                    continue;
                 }
             }
-            return null;
+            return combined;
         }
 
         private int GetPreferredIndex()

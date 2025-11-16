@@ -5,6 +5,7 @@ using Duckov.Modding;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using ItemWheel.Integration;
+using ItemWheel.Utils;
 
 namespace ItemWheel
 {
@@ -110,6 +111,12 @@ namespace ItemWheel
             [HarmonyPrefix]
             private static bool OnPlayerSwitchItemAgentMelee_Prefix(InputAction.CallbackContext context)
             {
+                // 🆕 检测UI输入框焦点，避免与UI输入冲突
+                if (UIFocusDetector.IsInputFieldFocused())
+                {
+                    return true; // 有输入框获得焦点，放行官方输入
+                }
+
                 if (_instance == null) return true;
 
                 bool isEnabled = ModSettingFacade.Settings.IsWheelEnabled(ItemWheelSystem.ItemWheelCategory.Melee);
@@ -155,6 +162,12 @@ namespace ItemWheel
 
             private static bool Forward(InputAction.CallbackContext context, int shortcutIndex)
             {
+                // 🆕 检测UI输入框焦点，避免与UI输入冲突
+                if (UIFocusDetector.IsInputFieldFocused())
+                {
+                    return true; // 有输入框获得焦点，放行官方输入
+                }
+
                 if (_instance == null) return true;
 
                 try

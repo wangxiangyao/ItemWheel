@@ -1484,6 +1484,9 @@ namespace ItemWheel
             // LastConfirmedIndex 只在点击时通过 OnSelectionChanged 更新
             if (item != null)
             {
+                // 🆕 在使用物品前，记录物品的原始位置（修复官方Bug：物品从宠物背包/容器回到玩家背包）
+                Patches.CA_UseItem_Patch.RecordItemLocation(item);
+
                 UseItem(item, wheel.Category);
 
                 // 🆕 阶段4：通知Handler物品被选中

@@ -89,6 +89,9 @@ namespace ItemWheel
             _wheels = new Dictionary<ItemWheelCategory, CategoryWheel>();
             LevelManager.OnLevelInitialized += HandleLevelInitialized;
 
+            // 🆕 监听快捷栏拖拽设置事件
+            Duckov.ItemShortcut.OnSetItem += OnShortcutItemSet;
+
             // 🆕 使用统一的 WheelSpriteLoader 加载自定义格子Sprite
             WheelSpriteLoader.Load();
 
@@ -617,6 +620,9 @@ namespace ItemWheel
             // 🆕 释放子弹HUD着色器
             _bulletHUDColorizer?.Dispose();
 
+            // 🆕 取消快捷栏监听
+            Duckov.ItemShortcut.OnSetItem -= OnShortcutItemSet;
+
             // 🆕 取消背包监听
             if (_inventory != null)
             {
@@ -715,6 +721,139 @@ namespace ItemWheel
                 Debug.Log($"[ItemWheel] ✅ 初始化轮盘: {category}, 选中索引={wheel.LastConfirmedIndex}");
             }
         }
+
+        /// <summary>
+        /// 🆕 快捷栏物品设置事件处理器
+        /// 处理玩家拖拽物品到快捷栏的情况
+        /// </summary>
+        /// <param name="shortcutIndex">快捷栏索引（0-3对应快捷键3-6）</param>
+        private void OnShortcutItemSet(int shortcutIndex)
+        {
+            try
+            {
+                // 获取对应的轮盘类别
+                ItemWheelCategory category = GetCategoryForShortcutIndex(shortcutIndex);
+
+                // 获取设置的物品
+                Item item = Duckov.ItemShortcut.Get(shortcutIndex);
+
+                if (item == null)
+                {
+                    Debug.Log($"[ItemWheel] 快捷栏{shortcutIndex}被清空");
+                    return;
+                }
+
+                Debug.Log($"[ItemWheel] 检测到快捷栏{shortcutIndex}设置物品: {item.DisplayName}, 类别={category}");
+
+                // 检查物品是否匹配该类别
+                if (IsItemMatchCategory(item, category))
+                {
+                    Debug.Log($"[ItemWheel] ✅ 物品匹配类别{category}，切换选中");
+
+                    // 确保轮盘存在
+                    var wheel = EnsureWheel(category);
+
+                    // 刷新轮盘以获取最新物品列表
+                    RefreshCategorySlots(wheel, resetSelection: false, skipShortcutSync: true);
+
+                    // 查找物品在轮盘中的索引
+                    int wheelIndex = FindItemIndexInWheel(wheel, item);
+
+                    if (wheelIndex >= 0)
+                    {
+                        // 切换选中
+                        wheel.LastConfirmedIndex = wheelIndex;
+                        wheel.LastSelectedItem = item;
+
+                        Debug.Log($"[ItemWheel] ✅ 成功切换选中到索引{wheelIndex}: {item.DisplayName}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[ItemWheel] ⚠️ 在轮盘中找不到物品: {item.DisplayName}");
+                    }
+                }
+                else
+                {
+                    Debug.Log($"[ItemWheel] ❌ 物品不匹配类别{category}，显示提示");
+
+                    // 显示气泡提示
+                    string categoryName = GetCategoryDisplayName(category);
+                    string shortcutKey = (shortcutIndex + 3).ToString(); // 快捷键3-6
+                    ConditionHintManager.ShowWrongCategory(item.DisplayName, categoryName, shortcutKey);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ItemWheel] OnShortcutItemSet失败: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// 根据快捷栏索引获取对应的轮盘类别
+        /// </summary>
+        public static ItemWheelCategory GetCategoryForShortcutIndex(int index) => index switch
+        {
+            0 => ItemWheelCategory.Medical,
+            1 => ItemWheelCategory.Stim,
+            2 => ItemWheelCategory.Food,
+            3 => ItemWheelCategory.Explosive,
+            _ => ItemWheelCategory.Medical
+        };
+
+        /// <summary>
+        /// 检查物品是否匹配指定类别
+        /// </summary>
+        public static bool IsItemMatchCategory(Item item, ItemWheelCategory category)
+        {
+            if (item?.Tags == null || item.Tags.Count == 0)
+                return false;
+
+            // 遍历物品的所有Tag，检查是否匹配类别
+            foreach (var tag in item.Tags)
+            {
+                if (tag == null) continue;
+
+                // Tag是ScriptableObject，使用其name属性匹配
+                string tagName = tag.name;
+                if (TagMappings.TryGetValue(tagName, out var tagCategory))
+                {
+                    if (tagCategory == category)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 在轮盘中查找物品的索引
+        /// </summary>
+        private static int FindItemIndexInWheel(CategoryWheel wheel, Item item)
+        {
+            if (wheel?.Slots == null || item == null)
+                return -1;
+
+            for (int i = 0; i < wheel.Slots.Length; i++)
+            {
+                if (wheel.Slots[i] == item)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// 获取类别的显示名称（用于提示）
+        /// </summary>
+        public static string GetCategoryDisplayName(ItemWheelCategory category) => category switch
+        {
+            ItemWheelCategory.Medical => "医疗品",
+            ItemWheelCategory.Stim => "针剂",
+            ItemWheelCategory.Food => "食物",
+            ItemWheelCategory.Explosive => "手雷",
+            ItemWheelCategory.Melee => "近战武器",
+            _ => "未知"
+        };
 
         /// <summary>
         /// 🆕 背包内容变化事件处理器

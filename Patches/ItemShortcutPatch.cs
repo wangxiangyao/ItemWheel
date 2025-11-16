@@ -8,10 +8,50 @@ namespace ItemWheel.Patches
 {
     /// <summary>
     /// 扩展官方快捷栏功能，支持容器和宠物背包中的物品
+    /// 🆕 拦截Set方法，阻止不匹配类别的物品被设置到快捷栏
     /// </summary>
     [HarmonyPatch(typeof(Duckov.ItemShortcut))]
     internal static class ItemShortcutPatch
     {
+        /// <summary>
+        /// 🆕 拦截Set方法，检查物品类别是否匹配快捷栏
+        /// </summary>
+        [HarmonyPrefix]
+        [HarmonyPatch("Set")]
+        private static bool Set_Prefix(int index, Item item, ref bool __result)
+        {
+            try
+            {
+                // 如果是清空快捷栏（item==null），允许
+                if (item == null)
+                {
+                    return true;
+                }
+
+                // 检查物品类别是否匹配快捷栏
+                var category = ItemWheelSystem.GetCategoryForShortcutIndex(index);
+                if (!ItemWheelSystem.IsItemMatchCategory(item, category))
+                {
+                    // 不匹配：显示提示并阻止设置
+                    string categoryName = ItemWheelSystem.GetCategoryDisplayName(category);
+                    string shortcutKey = (index + 3).ToString(); // 快捷键3-6
+                    ConditionHintManager.ShowWrongCategory(item.DisplayName, categoryName, shortcutKey);
+
+                    Debug.Log($"[ItemWheel] ❌ 阻止设置不匹配物品: {item.DisplayName} → 快捷键{shortcutKey}({categoryName})");
+
+                    __result = false;
+                    return false; // 阻止原方法执行
+                }
+
+                // 匹配：允许设置继续
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ItemWheel] ItemShortcut.Set 补丁失败: {ex.Message}");
+                return true; // 出错时允许原方法执行
+            }
+        }
         /// <summary>
         /// 补丁 IsItemValid 方法，扩展验证逻辑
         /// 原方法只允许主背包物品，我们扩展为支持：

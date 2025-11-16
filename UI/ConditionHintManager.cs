@@ -15,6 +15,7 @@ namespace ItemWheel
         public enum HintCondition
         {
             ItemNotUsable = 1,
+            WrongCategory = 2,  // 物品类别不匹配快捷栏
             // TODO: Cooldown, OutOfAmmo, Blocked, NoTarget, etc.
         }
 
@@ -61,11 +62,38 @@ namespace ItemWheel
                         }
                     },
                 }
+            },
+            {
+                HintCondition.WrongCategory,
+                new Dictionary<Emotion, List<string>>
+                {
+                    { Emotion.Neutral, new List<string>
+                        {
+                            "{item}不是{category}类物品。(・_・)",
+                            "{item}放错快捷栏了。(>_<)",
+                            "这不是{category}。",
+                        }
+                    },
+                    { Emotion.Mild, new List<string>
+                        {
+                            "{item}应该放到其他快捷栏。(-_-;)",
+                            "快捷键{shortcut}是{category}专用的。",
+                            "放错地方了。(>_<)",
+                        }
+                    },
+                    { Emotion.Angry, new List<string>
+                        {
+                            "这不对！(╬ﾟдﾟ)",
+                            "{item}不属于这里！",
+                            "快捷键{shortcut}是{category}用的！",
+                        }
+                    },
+                }
             }
         };
 
         /// <summary>
-        /// 对外接口：显示“物品不可使用”的提示。
+        /// 对外接口：显示"物品不可使用"的提示。
         /// 会根据触发次数选择不同情绪与文案，并轮换同情绪下的句式。
         /// </summary>
         public static void ShowItemNotUsable(string itemName)
@@ -73,6 +101,23 @@ namespace ItemWheel
             Show(HintCondition.ItemNotUsable, new Dictionary<string, string>
             {
                 { "item", string.IsNullOrEmpty(itemName) ? "该物品" : itemName }
+            });
+        }
+
+        /// <summary>
+        /// 对外接口：显示"物品类别错误"的提示。
+        /// 用于拖拽物品到不匹配的快捷栏时的提示。
+        /// </summary>
+        /// <param name="itemName">物品名称</param>
+        /// <param name="categoryName">快捷栏类别名称（如"医疗品"、"刺激物"）</param>
+        /// <param name="shortcutKey">快捷键名称（如"3"、"4"）</param>
+        public static void ShowWrongCategory(string itemName, string categoryName, string shortcutKey)
+        {
+            Show(HintCondition.WrongCategory, new Dictionary<string, string>
+            {
+                { "item", string.IsNullOrEmpty(itemName) ? "该物品" : itemName },
+                { "category", string.IsNullOrEmpty(categoryName) ? "此类" : categoryName },
+                { "shortcut", string.IsNullOrEmpty(shortcutKey) ? "该键" : shortcutKey }
             });
         }
 

@@ -78,6 +78,13 @@ namespace ItemWheel.Features.BulletTime
         /// </summary>
         public void Update()
         {
+            // 🆕 检查游戏是否暂停（timeScale=0），如果暂停了就不要覆盖
+            if (Mathf.Abs(Time.timeScale) < 0.01f)
+            {
+                // 游戏暂停中（ESC菜单等），不要干扰
+                return;
+            }
+
             // 计算目标值
             float targetTimeScale = _isEnabled ? _targetTimeScale : 1f;
             float targetFixedDelta = _isEnabled ? _targetFixedDeltaTime : NormalFixedDeltaTime;

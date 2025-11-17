@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using HarmonyLib;
 using ItemStatsSystem;
+using ItemWheel.Integration;
 using UnityEngine;
 
 namespace ItemWheel.Patches
@@ -28,8 +29,20 @@ namespace ItemWheel.Patches
                     return true;
                 }
 
+                // 只拦截 3~6 对应的索引 0~3
+                if (index < 0 || index > 3)
+                {
+                    return true;
+                }
+
                 // 检查物品类别是否匹配快捷栏
                 var category = ItemWheelSystem.GetCategoryForShortcutIndex(index);
+
+                if (!ModSettingFacade.Settings.IsWheelEnabled(category))
+                {
+                    return true;
+                }
+
                 if (!ItemWheelSystem.IsItemMatchCategory(item, category))
                 {
                     // 不匹配：显示提示并阻止设置

@@ -731,8 +731,20 @@ namespace ItemWheel
         {
             try
             {
+                if (shortcutIndex < 0 || shortcutIndex > 3)
+                {
+                    Debug.Log($"[ItemWheel] 快捷栏{shortcutIndex}不受轮盘管理，忽略同步。");
+                    return;
+                }
+
                 // 获取对应的轮盘类别
                 ItemWheelCategory category = GetCategoryForShortcutIndex(shortcutIndex);
+
+                if (!ModSettingFacade.Settings.IsWheelEnabled(category))
+                {
+                    Debug.Log($"[ItemWheel] 快捷栏{shortcutIndex}关联的轮盘({category})已禁用，忽略同步。");
+                    return;
+                }
 
                 // 获取设置的物品
                 Item item = Duckov.ItemShortcut.Get(shortcutIndex);

@@ -31,7 +31,14 @@ namespace ItemWheel
             _wheelSystem = new ItemWheelSystem();
 
             _harmony = new Harmony("com.duckov.itemwheel");
-            _harmony.PatchAll(typeof(ModBehaviour).Assembly);
+            try
+            {
+                _harmony.PatchAll(typeof(ModBehaviour).Assembly);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ItemWheel] Harmony patch failed: {ex}");
+            }
 
             CompatibilityBootstrap.Initialize();
         }
@@ -60,15 +67,43 @@ namespace ItemWheel
 
         private void Update()
         {
-            _wheelSystem?.Update(); // ✅ 步骤2恢复：更新轮盘系统
+            if (_wheelSystem == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _wheelSystem.Update();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ItemWheel] Wheel update failed: {ex}");
+            }
         }
 
         private void OnDestroy()
         {
             if (_instance == this)
             {
-                _harmony?.UnpatchAll(_harmony.Id);
-                _wheelSystem?.Dispose(); // ✅ 步骤2恢复：释放轮盘系统
+                try
+                {
+                    _harmony?.UnpatchAll(_harmony.Id);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ItemWheel] Unpatch failed: {ex}");
+                }
+
+                try
+                {
+                    _wheelSystem?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ItemWheel] Dispose failed: {ex}");
+                }
+
                 _instance = null;
             }
         }

@@ -1744,6 +1744,7 @@ namespace ItemWheel
             {
                 wheel.LastConfirmedIndex = index;
                 wheel.LastSelectedItem = item;
+                SyncSelectionAfterUpdate(wheel);
                 return;
             }
 
@@ -1752,6 +1753,7 @@ namespace ItemWheel
             {
                 wheel.LastConfirmedIndex = existingIndex;
                 wheel.LastSelectedItem = wheel.Slots[existingIndex];
+                SyncSelectionAfterUpdate(wheel);
                 return;
             }
 
@@ -1760,6 +1762,30 @@ namespace ItemWheel
             wheel.LastSelectedItem = (fallbackIndex >= 0 && wheel.Slots != null && fallbackIndex < wheel.Slots.Length)
                 ? wheel.Slots[fallbackIndex]
                 : null;
+            SyncSelectionAfterUpdate(wheel);
+        }
+
+        private void SyncSelectionAfterUpdate(CategoryWheel wheel)
+        {
+            if (wheel == null)
+            {
+                return;
+            }
+
+            if (wheel.Wheel != null && wheel.LastConfirmedIndex >= 0)
+            {
+                wheel.Wheel.SetSelectedIndex(wheel.LastConfirmedIndex);
+            }
+
+            if (wheel.Category != ItemWheelCategory.Melee &&
+                wheel.Category != ItemWheelCategory.Gun &&
+                wheel.LastConfirmedIndex >= 0 &&
+                wheel.Slots != null &&
+                wheel.LastConfirmedIndex < wheel.Slots.Length &&
+                wheel.Slots[wheel.LastConfirmedIndex] != null)
+            {
+                Duckov.ItemShortcut.Set((int)wheel.Category, wheel.Slots[wheel.LastConfirmedIndex]);
+            }
         }
 
         private void OnWheelHidden(CategoryWheel wheel, int index)

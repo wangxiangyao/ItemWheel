@@ -1726,15 +1726,40 @@ namespace ItemWheel
                     handler.OnItemSelected(item, index, wheel);
                 }
 
-                if (ModSettingFacade.Settings.SelectLastUsedItem &&
-                    wheel.Category != ItemWheelCategory.Melee &&
-                    wheel.Category != ItemWheelCategory.Gun &&
-                    wheel.Wheel != null &&
-                    index >= 0)
+                if (ModSettingFacade.Settings.SelectLastUsedItem)
                 {
-                    wheel.Wheel.SetSelectedIndex(index);
+                    UpdateSelectionAfterUse(wheel, item, index);
                 }
             }
+        }
+        
+        private void UpdateSelectionAfterUse(CategoryWheel wheel, Item item, int index)
+        {
+            if (wheel == null)
+            {
+                return;
+            }
+
+            if (wheel.Slots != null && index >= 0 && index < wheel.Slots.Length && wheel.Slots[index] == item)
+            {
+                wheel.LastConfirmedIndex = index;
+                wheel.LastSelectedItem = item;
+                return;
+            }
+
+            int existingIndex = FindItemIndexInSlots(wheel.Slots, item);
+            if (existingIndex >= 0)
+            {
+                wheel.LastConfirmedIndex = existingIndex;
+                wheel.LastSelectedItem = wheel.Slots[existingIndex];
+                return;
+            }
+
+            int fallbackIndex = GetFirstAvailableItemIndex(wheel);
+            wheel.LastConfirmedIndex = fallbackIndex;
+            wheel.LastSelectedItem = (fallbackIndex >= 0 && wheel.Slots != null && fallbackIndex < wheel.Slots.Length)
+                ? wheel.Slots[fallbackIndex]
+                : null;
         }
 
         private void OnWheelHidden(CategoryWheel wheel, int index)

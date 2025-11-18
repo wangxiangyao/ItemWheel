@@ -197,6 +197,21 @@ namespace ItemWheel.Integration
                     value => _settings.EnableAmmoWheel = value
                 );
 
+                ModSettingAPI.AddToggle(
+                    "ItemWheel_EnableTotemWheel",
+                    "图腾轮盘 (长按B)",
+                    GetSavedValue("ItemWheel_EnableTotemWheel", _settings.EnableTotemWheel),
+                    value => _settings.EnableTotemWheel = value
+                );
+
+                ModSettingAPI.AddKeybinding(
+                    "ItemWheel_TotemWheelKey",
+                    "图腾轮盘快捷键",
+                    GetSavedValue("ItemWheel_TotemWheelKey", _settings.TotemWheelKey),
+                    KeyCode.B,
+                    value => _settings.TotemWheelKey = value
+                );
+
                 // ==================== UI设置 ====================
 
                 ModSettingAPI.AddToggle(
@@ -317,6 +332,8 @@ namespace ItemWheel.Integration
             _settings.IncludeEquippedGuns = GetSavedValue("ItemWheel_IncludeEquippedGuns", false);
             _settings.SelectLastUsedItem = GetSavedValue("ItemWheel_SelectLastUsedItem", false);
             _settings.EnableAmmoWheel = GetSavedValue("ItemWheel_EnableAmmo", true);
+            _settings.EnableTotemWheel = GetSavedValue("ItemWheel_EnableTotemWheel", true);
+            _settings.TotemWheelKey = GetSavedValue("ItemWheel_TotemWheelKey", KeyCode.B);
             _settings.ShowItemCount = GetSavedValue("ItemWheel_ShowItemCount", true);
             _settings.ShowDurabilityBar = GetSavedValue("ItemWheel_ShowDurabilityBar", true);
             _settings.ShowName = GetSavedValue("ItemWheel_ShowName", true);

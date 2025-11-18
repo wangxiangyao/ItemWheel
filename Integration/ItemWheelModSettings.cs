@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace ItemWheel.Integration
 {
@@ -61,6 +62,16 @@ namespace ItemWheel.Integration
         /// 子弹轮盘 (长按R)
         /// </summary>
         public bool EnableAmmoWheel { get; set; } = true;
+
+        /// <summary>
+        /// 图腾轮盘 (长按B)
+        /// </summary>
+        public bool EnableTotemWheel { get; set; } = true;
+
+        /// <summary>
+        /// 图腾轮盘快捷键
+        /// </summary>
+        public KeyCode TotemWheelKey { get; set; } = KeyCode.B;
 
         // ==================== UI设置 ====================
 
@@ -150,7 +161,8 @@ namespace ItemWheel.Integration
                    $"  SearchInSlots={SearchInSlots}\n" +
                    $"  SearchInPetInventory={SearchInPetInventory}\n" +
                    $"  Medical={EnableMedicalWheel}, Stim={EnableStimWheel}, Food={EnableFoodWheel}\n" +
-                   $"  Explosive={EnableExplosiveWheel}, Melee={EnableMeleeWheel}, Gun={EnableGunWheel}, Ammo={EnableAmmoWheel}\n" +
+                   $"  Explosive={EnableExplosiveWheel}, Melee={EnableMeleeWheel}, Gun={EnableGunWheel}, Ammo={EnableAmmoWheel}, Totem={EnableTotemWheel}\n" +
+                   $"  TotemKey={TotemWheelKey}\n" +
                    $"  IncludeEquippedGuns={IncludeEquippedGuns}, SelectLastUsedItem={SelectLastUsedItem}\n" +
                    $"]";
         }

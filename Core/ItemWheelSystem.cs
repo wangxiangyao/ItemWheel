@@ -1727,12 +1727,12 @@ namespace ItemWheel
                 }
 
                 if (ModSettingFacade.Settings.SelectLastUsedItem &&
-                    wheel.Slots != null &&
-                    index >= 0 &&
-                    index < wheel.Slots.Length)
+                    wheel.Category != ItemWheelCategory.Melee &&
+                    wheel.Category != ItemWheelCategory.Gun &&
+                    wheel.Wheel != null &&
+                    index >= 0)
                 {
-                    wheel.LastConfirmedIndex = index;
-                    wheel.LastSelectedItem = item;
+                    wheel.Wheel.SetSelectedIndex(index);
                 }
             }
         }

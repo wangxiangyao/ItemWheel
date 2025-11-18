@@ -87,6 +87,11 @@ namespace ItemWheel.Integration
         // ==================== 特殊功能 ====================
 
         /// <summary>
+        /// 使用后是否将最近使用的物品设置为默认选中
+        /// </summary>
+        public bool SelectLastUsedItem { get; set; } = false;
+
+        /// <summary>
         /// 启用子弹时间效果（打开轮盘时减慢游戏速度）
         /// </summary>
         public bool EnableBulletTime { get; set; } = false;
@@ -146,7 +151,7 @@ namespace ItemWheel.Integration
                    $"  SearchInPetInventory={SearchInPetInventory}\n" +
                    $"  Medical={EnableMedicalWheel}, Stim={EnableStimWheel}, Food={EnableFoodWheel}\n" +
                    $"  Explosive={EnableExplosiveWheel}, Melee={EnableMeleeWheel}, Gun={EnableGunWheel}, Ammo={EnableAmmoWheel}\n" +
-                   $"  IncludeEquippedGuns={IncludeEquippedGuns}\n" +
+                   $"  IncludeEquippedGuns={IncludeEquippedGuns}, SelectLastUsedItem={SelectLastUsedItem}\n" +
                    $"]";
         }
     }

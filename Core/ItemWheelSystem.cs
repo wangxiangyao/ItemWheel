@@ -1725,6 +1725,15 @@ namespace ItemWheel
                 {
                     handler.OnItemSelected(item, index, wheel);
                 }
+
+                if (ModSettingFacade.Settings.SelectLastUsedItem &&
+                    wheel.Slots != null &&
+                    index >= 0 &&
+                    index < wheel.Slots.Length)
+                {
+                    wheel.LastConfirmedIndex = index;
+                    wheel.LastSelectedItem = item;
+                }
             }
         }
 

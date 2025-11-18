@@ -184,6 +184,13 @@ namespace ItemWheel.Integration
                 );
 
                 ModSettingAPI.AddToggle(
+                    "ItemWheel_SelectLastUsedItem",
+                    "使用后选中最近物品",
+                    GetSavedValue("ItemWheel_SelectLastUsedItem", _settings.SelectLastUsedItem),
+                    value => _settings.SelectLastUsedItem = value
+                );
+
+                ModSettingAPI.AddToggle(
                     "ItemWheel_EnableAmmo",
                     "子弹轮盘 (长按R)",
                     GetSavedValue("ItemWheel_EnableAmmo", _settings.EnableAmmoWheel),
@@ -308,6 +315,7 @@ namespace ItemWheel.Integration
             _settings.EnableMeleeWheel = GetSavedValue("ItemWheel_EnableMelee", true);
             _settings.EnableGunWheel = GetSavedValue("ItemWheel_EnableGun", true);
             _settings.IncludeEquippedGuns = GetSavedValue("ItemWheel_IncludeEquippedGuns", false);
+            _settings.SelectLastUsedItem = GetSavedValue("ItemWheel_SelectLastUsedItem", false);
             _settings.EnableAmmoWheel = GetSavedValue("ItemWheel_EnableAmmo", true);
             _settings.ShowItemCount = GetSavedValue("ItemWheel_ShowItemCount", true);
             _settings.ShowDurabilityBar = GetSavedValue("ItemWheel_ShowDurabilityBar", true);

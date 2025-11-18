@@ -3,7 +3,7 @@ using UnityEngine;
 namespace ItemWheel.Integration.Compatibility
 {
     /// <summary>
-    /// 兼容性模块初始化入口
+    /// Compatibility module bootstrapper.
     /// </summary>
     internal static class CompatibilityBootstrap
     {
@@ -19,8 +19,8 @@ namespace ItemWheel.Integration.Compatibility
             _initialized = true;
             Debug.Log("[ItemWheel] Initializing compatibility modules...");
 
-            // ✅ 使用官方 ModManager.OnModActivated 事件（安全，不干扰其他 mod）
             CashSlotCompatibility.TryInitialize();
+            ShoulderSurfingCompatibility.TryInitialize();
         }
     }
 }

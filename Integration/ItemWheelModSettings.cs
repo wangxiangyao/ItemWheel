@@ -48,6 +48,16 @@ namespace ItemWheel.Integration
         public bool EnableMeleeWheel { get; set; } = true;
 
         /// <summary>
+        /// 枪械轮盘 (长按1/2)
+        /// </summary>
+        public bool EnableGunWheel { get; set; } = true;
+
+        /// <summary>
+        /// 是否将装备栏中的枪械纳入轮盘
+        /// </summary>
+        public bool IncludeEquippedGuns { get; set; } = false;
+
+        /// <summary>
         /// 子弹轮盘 (长按R)
         /// </summary>
         public bool EnableAmmoWheel { get; set; } = true;
@@ -113,6 +123,7 @@ namespace ItemWheel.Integration
                 ItemWheelSystem.ItemWheelCategory.Food => EnableFoodWheel,
                 ItemWheelSystem.ItemWheelCategory.Explosive => EnableExplosiveWheel,
                 ItemWheelSystem.ItemWheelCategory.Melee => EnableMeleeWheel,
+                ItemWheelSystem.ItemWheelCategory.Gun => EnableGunWheel,
                 _ => true
             };
         }
@@ -134,7 +145,8 @@ namespace ItemWheel.Integration
                    $"  SearchInSlots={SearchInSlots}\n" +
                    $"  SearchInPetInventory={SearchInPetInventory}\n" +
                    $"  Medical={EnableMedicalWheel}, Stim={EnableStimWheel}, Food={EnableFoodWheel}\n" +
-                   $"  Explosive={EnableExplosiveWheel}, Melee={EnableMeleeWheel}, Ammo={EnableAmmoWheel}\n" +
+                   $"  Explosive={EnableExplosiveWheel}, Melee={EnableMeleeWheel}, Gun={EnableGunWheel}, Ammo={EnableAmmoWheel}\n" +
+                   $"  IncludeEquippedGuns={IncludeEquippedGuns}\n" +
                    $"]";
         }
     }

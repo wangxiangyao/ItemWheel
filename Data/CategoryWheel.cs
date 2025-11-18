@@ -37,6 +37,9 @@ namespace ItemWheel.Data
         /// <summary>是否首次加载（用于从官方快捷栏同步选中）</summary>
         public bool IsFirstLoad;
 
+        /// <summary>枪械轮盘当前目标槽位（1主手/2副手）</summary>
+        public ItemWheelSystem.GunSlotTarget? TargetGunSlot;
+
         // ==================== 数据管理（新架构）====================
 
         /// <summary>

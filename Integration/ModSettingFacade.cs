@@ -166,6 +166,24 @@ namespace ItemWheel.Integration
                 );
 
                 ModSettingAPI.AddToggle(
+                    "ItemWheel_EnableGun",
+                    "枪械轮盘 (长按1/2)",
+                    GetSavedValue("ItemWheel_EnableGun", _settings.EnableGunWheel),
+                    value =>
+                    {
+                        Debug.Log($"[ItemWheel] 设置更新: EnableGunWheel = {value}");
+                        _settings.EnableGunWheel = value;
+                    }
+                );
+
+                ModSettingAPI.AddToggle(
+                    "ItemWheel_IncludeEquippedGuns",
+                    "枪械轮盘包含装备栏武器",
+                    GetSavedValue("ItemWheel_IncludeEquippedGuns", _settings.IncludeEquippedGuns),
+                    value => _settings.IncludeEquippedGuns = value
+                );
+
+                ModSettingAPI.AddToggle(
                     "ItemWheel_EnableAmmo",
                     "子弹轮盘 (长按R)",
                     GetSavedValue("ItemWheel_EnableAmmo", _settings.EnableAmmoWheel),
@@ -288,6 +306,8 @@ namespace ItemWheel.Integration
             _settings.EnableFoodWheel = GetSavedValue("ItemWheel_EnableFood", true);
             _settings.EnableExplosiveWheel = GetSavedValue("ItemWheel_EnableExplosive", true);
             _settings.EnableMeleeWheel = GetSavedValue("ItemWheel_EnableMelee", true);
+            _settings.EnableGunWheel = GetSavedValue("ItemWheel_EnableGun", true);
+            _settings.IncludeEquippedGuns = GetSavedValue("ItemWheel_IncludeEquippedGuns", false);
             _settings.EnableAmmoWheel = GetSavedValue("ItemWheel_EnableAmmo", true);
             _settings.ShowItemCount = GetSavedValue("ItemWheel_ShowItemCount", true);
             _settings.ShowDurabilityBar = GetSavedValue("ItemWheel_ShowDurabilityBar", true);

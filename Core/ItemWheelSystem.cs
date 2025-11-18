@@ -29,7 +29,14 @@ namespace ItemWheel
             Stim = 1,
             Food = 2,
             Explosive = 3,
-            Melee = 4
+            Melee = 4,
+            Gun = 5
+        }
+
+        public enum GunSlotTarget
+        {
+            Primary = 1,
+            Secondary = 2
         }
 
         // 删除AllCategories数组，未使用
@@ -41,7 +48,8 @@ namespace ItemWheel
                 { "Injector", ItemWheelCategory.Stim },
                 { "Food", ItemWheelCategory.Food },
                 { "Explosive", ItemWheelCategory.Explosive },
-                { "MeleeWeapon", ItemWheelCategory.Melee }
+                { "MeleeWeapon", ItemWheelCategory.Melee },
+                { "Gun", ItemWheelCategory.Gun }
             };
 
         // CategoryWheel 已移到 ItemWheel.Data.CategoryWheel
@@ -82,6 +90,7 @@ namespace ItemWheel
             public const int MAX_WAIT_FRAMES = 5; // 等待5帧（约0.08秒）
         }
         private List<PendingDisappearance> _pendingDisappearances = new List<PendingDisappearance>();
+        private GunSlotTarget? _activeGunSlotTarget;
 
         public ItemWheelSystem()
         {
@@ -122,6 +131,9 @@ namespace ItemWheel
 
             // 近战使用专用Handler（需要inventory访问）
             _handlers[ItemWheelCategory.Melee] = new Handlers.MeleeHandler(() => _inventory);
+
+            // 枪械处理器
+            _handlers[ItemWheelCategory.Gun] = new Handlers.GunHandler();
 
             Debug.Log("[ItemWheel] Handlers initialized");
         }
@@ -230,6 +242,15 @@ namespace ItemWheel
                 wheel.Wheel.SetSelectedIndex(wheel.LastConfirmedIndex);
             }
 
+            if (category == ItemWheelCategory.Gun)
+            {
+                wheel.TargetGunSlot = _activeGunSlotTarget;
+            }
+            else
+            {
+                wheel.TargetGunSlot = null;
+            }
+
             // 🆕 阶段4：轮盘显示前调用Handler
             if (_handlers != null && _handlers.TryGetValue(category, out var handler))
             {
@@ -297,6 +318,19 @@ namespace ItemWheel
             return ModSettingFacade.Settings.IsWheelEnabled(category);
         }
 
+        public void OnGunKeyPressed(GunSlotTarget target)
+        {
+            _activeGunSlotTarget = target;
+            OnKeyPressed(ItemWheelCategory.Gun);
+        }
+
+        public void OnGunKeyReleased(GunSlotTarget target)
+        {
+            _activeGunSlotTarget = target;
+            OnKeyReleased(ItemWheelCategory.Gun);
+            _activeGunSlotTarget = null;
+        }
+
         /// <summary>
         /// 按键按下事件（由ModBehavior调用）
         /// 开始长按计时
@@ -351,8 +385,8 @@ namespace ItemWheel
             else
             {
                 // 短按：直接使用物品
-                // 近战武器：短按不处理，让官方方法生效（在ModBehaviour的Harmony Patch中处理）
-                if (category != ItemWheelCategory.Melee)
+                // 近战/枪械：短按不处理，让官方方法生效（在ModBehaviour的Harmony Patch中处理）
+                if (category != ItemWheelCategory.Melee && category != ItemWheelCategory.Gun)
                 {
                     UseShortcutDirect(category);
                 }
@@ -700,7 +734,8 @@ namespace ItemWheel
                 ItemWheelCategory.Medical,
                 ItemWheelCategory.Stim,
                 ItemWheelCategory.Food,
-                ItemWheelCategory.Explosive
+                ItemWheelCategory.Explosive,
+                ItemWheelCategory.Gun
             };
 
             foreach (var category in categories)
@@ -1714,8 +1749,8 @@ namespace ItemWheel
                 // 🆕 保存选中物品的引用（用于背包变化后准确恢复）
                 wheel.LastSelectedItem = wheel.Slots[selectedIndex];
 
-                // 同步官方快捷栏（近战不更新官方快捷栏）
-                if (wheel.Category != ItemWheelCategory.Melee)
+                // 同步官方快捷栏（近战/枪械不更新官方快捷栏）
+                if (wheel.Category != ItemWheelCategory.Melee && wheel.Category != ItemWheelCategory.Gun)
                 {
                     var shortcutIndex = (int)wheel.Category;
                     Duckov.ItemShortcut.Set(shortcutIndex, wheel.Slots[selectedIndex]);
@@ -1744,6 +1779,25 @@ namespace ItemWheel
                     catch (Exception ex)
                     {
                         Debug.LogWarning($"[ItemWheel] 近战装备失败: {ex.Message}");
+                    }
+                }
+                else if (wheel.Category == ItemWheelCategory.Gun)
+                {
+                    try
+                    {
+                        var character = CharacterMainControl.Main ?? _character;
+                        var item = wheel.Slots[selectedIndex];
+                        if (character != null && item != null)
+                        {
+                            if (_handlers != null && _handlers.TryGetValue(ItemWheelCategory.Gun, out var handler))
+                            {
+                                handler.UseItem(item, character, wheel);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[ItemWheel] 枪械切换失败: {ex.Message}");
                     }
                 }
             }
@@ -1865,6 +1919,16 @@ namespace ItemWheel
                 );
             }
 
+            if (category == ItemWheelCategory.Gun)
+            {
+                return ItemCollector.CollectGuns(
+                    _inventory,
+                    _character,
+                    item => MatchesCategoryStatic(item, category),
+                    ModSettingFacade.Settings
+                );
+            }
+
             // 🆕 其他类别统一使用 ItemCollector
             return ItemCollector.Collect(
                 _inventory,
@@ -1885,6 +1949,11 @@ namespace ItemWheel
         /// <returns>是否匹配类别</returns>
         internal static bool MatchesCategoryStatic(Item item, ItemWheelCategory category)
         {
+            if (category == ItemWheelCategory.Gun)
+            {
+                return item != null && item.GetBool("IsGun", false);
+            }
+
             if (item?.Tags == null)
             {
                 Debug.Log($"[ItemWheel] MatchesCategory: Item {item?.DisplayName ?? "null"} has no tags");

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ItemStatsSystem;
+using ItemStatsSystem.Items;
 using ItemWheel.Core.ItemSources;
 using ItemWheel.Data;
 using ItemWheel.Integration;
@@ -211,6 +212,63 @@ namespace ItemWheel.Core
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 收集枪械武器（包含主副手槽中的武器）
+        /// </summary>
+        public static List<CollectedItemInfo> CollectGuns(
+            Inventory mainInventory,
+            CharacterMainControl character,
+            Func<Item, bool> matchPredicate,
+            ItemWheelModSettings settings)
+        {
+            var result = CollectNormal(mainInventory, matchPredicate, settings, character);
+            result.RemoveAll(info => !HasAmmo(info.Item));
+
+            var addedItems = new HashSet<Item>(result.Select(r => r.Item));
+
+            if (settings?.IncludeEquippedGuns == true)
+            {
+                TryAddWeaponSlotItem(character?.PrimWeaponSlot(), mainInventory, matchPredicate, result, addedItems);
+                TryAddWeaponSlotItem(character?.SecWeaponSlot(), mainInventory, matchPredicate, result, addedItems);
+            }
+
+            return result;
+        }
+
+        private static void TryAddWeaponSlotItem(
+            Slot slot,
+            Inventory fallbackInventory,
+            Func<Item, bool> matchPredicate,
+            List<CollectedItemInfo> result,
+            HashSet<Item> addedItems)
+        {
+            var slotItem = slot?.Content;
+            if (slotItem == null || addedItems.Contains(slotItem))
+            {
+                return;
+            }
+
+            if (!matchPredicate(slotItem) || !HasAmmo(slotItem))
+            {
+                return;
+            }
+
+            var location = new ItemLocation(fallbackInventory, -1, 0);
+            result.Add(new CollectedItemInfo(slotItem, location));
+            addedItems.Add(slotItem);
+        }
+
+        private static bool HasAmmo(Item item)
+        {
+            var gunSetting = item?.GetComponent<ItemSetting_Gun>();
+            if (gunSetting == null)
+            {
+                return false;
+            }
+
+            return gunSetting.BulletCount > 0;
         }
 
         /// <summary>

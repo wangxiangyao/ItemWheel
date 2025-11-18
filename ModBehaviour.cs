@@ -145,6 +145,16 @@ namespace ItemWheel
             [HarmonyPrefix]
             private static bool OnShortCutInput6(InputAction.CallbackContext context) => Forward(context, 3);
 
+            [HarmonyPatch("OnPlayerSwitchItemAgent1")]
+            [HarmonyPrefix]
+            private static bool OnPlayerSwitchItemAgent1(InputAction.CallbackContext context) =>
+                HandleGunInput(context, ItemWheelSystem.GunSlotTarget.Primary);
+
+            [HarmonyPatch("OnPlayerSwitchItemAgent2")]
+            [HarmonyPrefix]
+            private static bool OnPlayerSwitchItemAgent2(InputAction.CallbackContext context) =>
+                HandleGunInput(context, ItemWheelSystem.GunSlotTarget.Secondary);
+
             [HarmonyPatch("OnPlayerSwitchItemAgentMelee")]
             [HarmonyPrefix]
             private static bool OnPlayerSwitchItemAgentMelee_Prefix(InputAction.CallbackContext context)
@@ -262,6 +272,47 @@ namespace ItemWheel
                         }
                     }
                     return false;
+                }
+
+                return true;
+            }
+
+            private static bool HandleGunInput(InputAction.CallbackContext context, ItemWheelSystem.GunSlotTarget target)
+            {
+                if (UIFocusDetector.IsInputFieldFocused())
+                {
+                    return true;
+                }
+
+                if (_instance == null)
+                {
+                    return true;
+                }
+
+                bool isEnabled = ModSettingFacade.Settings.IsWheelEnabled(ItemWheelSystem.ItemWheelCategory.Gun);
+                if (!isEnabled)
+                {
+                    return true;
+                }
+
+                try
+                {
+                    if (context.started)
+                    {
+                        _instance._wheelSystem.OnGunKeyPressed(target);
+                        return true;
+                    }
+
+                    if (context.canceled)
+                    {
+                        bool hasTriggeredWheel = _instance._wheelSystem.HasTriggeredWheel(ItemWheelSystem.ItemWheelCategory.Gun);
+                        _instance._wheelSystem.OnGunKeyReleased(target);
+                        return !hasTriggeredWheel;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ItemWheel] 处理枪械快捷键失败: {ex}");
                 }
 
                 return true;

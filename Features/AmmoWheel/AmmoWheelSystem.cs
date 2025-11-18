@@ -283,38 +283,31 @@ namespace ItemWheel
                 return false;
             }
 
-            var combinedTypes = CollectBulletCounts(gun, inventories);
+            var collectResult = CollectBulletInfos(gun, inventories);
             _bulletTypeCounts.Clear();
-            foreach (var kv in combinedTypes)
+            foreach (var kv in collectResult.CountByType)
             {
                 _bulletTypeCounts[kv.Key] = kv.Value;
             }
 
-            if (combinedTypes.Count == 0)
+            if (_bulletTypeCounts.Count == 0)
             {
                 _slots = new Item[WheelConfig.SLOT_COUNT];
                 _wheel.SetSlots(_slots);
                 return false;
             }
 
-            var list = new List<Item>();
-            foreach (var kv in combinedTypes)
+            foreach (var kv in collectResult.Representatives)
             {
-                int typeId = kv.Key;
-                var rep = FindFirstItemOfType(inventories, typeId);
-                if (rep != null)
-                {
-                    _typeToItem[typeId] = rep;
-                    list.Add(rep);
-                }
+                _typeToItem[kv.Key] = kv.Value;
             }
 
             var buffer = new Item[WheelConfig.SLOT_COUNT];
             int idx = 0;
-            foreach (var it in list.Take(WheelConfig.SLOT_COUNT - 1))
+            foreach (var kv in _typeToItem.Take(WheelConfig.SLOT_COUNT - 1))
             {
                 if (idx == 8) idx++;
-                buffer[idx++] = it;
+                buffer[idx++] = kv.Value;
             }
 
             _slots = buffer;
@@ -322,55 +315,83 @@ namespace ItemWheel
             return true;
         }
 
-        private static Item FindFirstItemOfType(IEnumerable<Inventory> inventories, int typeId)
+        private static (Dictionary<int, int> CountByType, Dictionary<int, Item> Representatives) CollectBulletInfos(
+            ItemAgent_Gun gun,
+            IEnumerable<Inventory> inventories)
         {
+            var countByType = new Dictionary<int, int>();
+            var representatives = new Dictionary<int, Item>();
+
+            if (gun == null)
+            {
+                return (countByType, representatives);
+            }
+
+            string gunCaliber = null;
+            try
+            {
+                gunCaliber = gun.GunItemSetting?.Item?.Constants?.GetString("Caliber", null);
+            }
+            catch
+            {
+                gunCaliber = null;
+            }
+
+            var settings = ModSettingFacade.Settings;
             var options = new InventorySearchOptions(
                 inventories,
-                item => item != null && item.TypeID == typeId,
-                ModSettingFacade.Settings,
+                item => MatchesBulletCaliber(item, gunCaliber),
+                settings,
                 CharacterMainControl.Main);
-            return InventorySearcher.FindFirst(options)?.Item;
-        }
 
-        private static Dictionary<int, int> CollectBulletCounts(ItemAgent_Gun gun, IEnumerable<Inventory> inventories)
-        {
-            var combined = new Dictionary<int, int>();
-            foreach (var inv in inventories)
+            foreach (var result in InventorySearcher.SearchAll(options))
             {
-                if (inv == null)
+                var bullet = result.Item;
+                if (bullet == null)
                 {
                     continue;
                 }
-                try
+
+                int stack = Mathf.Max(1, bullet.StackCount);
+                if (countByType.TryGetValue(bullet.TypeID, out var existing))
                 {
-                    var types = gun.GunItemSetting.GetBulletTypesInInventory(inv);
-                    if (types == null)
-                    {
-                        continue;
-                    }
-                    foreach (var kv in types)
-                    {
-                        int count = kv.Value?.count ?? 0;
-                        if (count <= 0)
-                        {
-                            continue;
-                        }
-                        if (combined.TryGetValue(kv.Key, out var existing))
-                        {
-                            combined[kv.Key] = existing + count;
-                        }
-                        else
-                        {
-                            combined[kv.Key] = count;
-                        }
-                    }
+                    countByType[bullet.TypeID] = existing + stack;
                 }
-                catch
+                else
                 {
-                    continue;
+                    countByType[bullet.TypeID] = stack;
+                    representatives[bullet.TypeID] = bullet;
                 }
             }
-            return combined;
+
+            return (countByType, representatives);
+        }
+
+        private static bool MatchesBulletCaliber(Item item, string gunCaliber)
+        {
+            if (item == null || !item.GetBool("IsBullet", false))
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(gunCaliber))
+            {
+                return true;
+            }
+
+            try
+            {
+                string itemCaliber = item.Constants?.GetString("Caliber", null);
+                if (string.IsNullOrEmpty(itemCaliber))
+                {
+                    return false;
+                }
+                return string.Equals(itemCaliber, gunCaliber, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private int GetPreferredIndex()

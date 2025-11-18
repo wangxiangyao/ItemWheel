@@ -203,6 +203,28 @@ namespace ItemWheel.Handlers
                 {
                     try
                     {
+                        if (info.IsFromSlot && info.BackpackIndex >= 0 && info.BackpackIndex < inventory.Content.Count)
+                        {
+                            var container = inventory.Content[info.BackpackIndex];
+                            var slots = container?.Slots;
+                            var targetSlot = slots != null && info.SlotIndex >= 0 && info.SlotIndex < slots.Count
+                                ? slots.GetSlotByIndex(info.SlotIndex)
+                                : null;
+
+                            if (targetSlot != null)
+                            {
+                                item.Detach();
+                                if (targetSlot.Plug(item, out var displaced))
+                                {
+                                    if (displaced != null && displaced != item)
+                                    {
+                                        TryAddToMainInventory(displaced, character);
+                                    }
+                                    return true;
+                                }
+                            }
+                        }
+
                         item.Detach();
                         if (info.BackpackIndex >= 0 &&
                             info.BackpackIndex < inventory.Content.Count &&

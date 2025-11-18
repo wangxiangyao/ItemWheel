@@ -223,15 +223,37 @@ namespace ItemWheel.Core
             Func<Item, bool> matchPredicate,
             ItemWheelModSettings settings)
         {
-            var result = CollectNormal(mainInventory, matchPredicate, settings, character);
-            result.RemoveAll(info => !HasAmmo(info.Item));
+            var result = new List<CollectedItemInfo>();
 
-            var addedItems = new HashSet<Item>(result.Select(r => r.Item));
+            var inventories = InventorySearcher.GetInventoriesToSearch(
+                mainInventory,
+                settings.SearchInPetInventory
+            );
+
+            var options = new InventorySearchOptions(
+                inventories,
+                matchPredicate,
+                settings,
+                character
+            );
+
+            var searchResults = InventorySearcher.SearchAll(options);
+
+            foreach (var searchResult in searchResults)
+            {
+                if (searchResult.Item == null || !HasAmmo(searchResult.Item))
+                {
+                    continue;
+                }
+
+                var location = CreateLocation(searchResult);
+                result.Add(new CollectedItemInfo(searchResult.Item, location));
+            }
 
             if (settings?.IncludeEquippedGuns == true)
             {
-                TryAddWeaponSlotItem(character?.PrimWeaponSlot(), mainInventory, matchPredicate, result, addedItems);
-                TryAddWeaponSlotItem(character?.SecWeaponSlot(), mainInventory, matchPredicate, result, addedItems);
+                TryAddWeaponSlotItem(character?.PrimWeaponSlot(), mainInventory, matchPredicate, result);
+                TryAddWeaponSlotItem(character?.SecWeaponSlot(), mainInventory, matchPredicate, result);
             }
 
             return result;
@@ -241,11 +263,10 @@ namespace ItemWheel.Core
             Slot slot,
             Inventory fallbackInventory,
             Func<Item, bool> matchPredicate,
-            List<CollectedItemInfo> result,
-            HashSet<Item> addedItems)
+            List<CollectedItemInfo> result)
         {
             var slotItem = slot?.Content;
-            if (slotItem == null || addedItems.Contains(slotItem))
+            if (slotItem == null)
             {
                 return;
             }
@@ -255,9 +276,8 @@ namespace ItemWheel.Core
                 return;
             }
 
-            var location = new ItemLocation(fallbackInventory, -1, 0);
+            var location = new ItemLocation(fallbackInventory, -1, -1);
             result.Add(new CollectedItemInfo(slotItem, location));
-            addedItems.Add(slotItem);
         }
 
         private static bool HasAmmo(Item item)
